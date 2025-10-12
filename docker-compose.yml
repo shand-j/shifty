@@ -1,0 +1,262 @@
+# Shifty Multi-Tenant SaaS Platform
+# Docker Compose for development environment
+
+version: '3.8'
+
+services:
+  # Platform PostgreSQL Database
+  platform-db:
+    image: postgres:15-alpine
+    container_name: shifty-platform-db
+    environment:
+      POSTGRES_DB: shifty_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - platform_db_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/init-platform-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - shifty-network
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: shifty-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shifty-network
+
+  # Ollama AI Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: shifty-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=/root/.ollama/models
+    networks:
+      - shifty-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Tenant Manager Service
+  tenant-manager:
+    build:
+      context: .
+      dockerfile: services/tenant-manager/Dockerfile
+    container_name: shifty-tenant-manager
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - platform-db
+      - redis
+    networks:
+      - shifty-network
+    volumes:
+      - ./services/tenant-manager:/app
+      - /app/node_modules
+
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: shifty-auth-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=dev-secret-key-change-in-production
+    depends_on:
+      - platform-db
+      - redis
+    networks:
+      - shifty-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: shifty-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - TENANT_MANAGER_URL=http://tenant-manager:3001
+      - AUTH_SERVICE_URL=http://auth-service:3002
+      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
+      - TEST_GENERATOR_URL=http://test-generator:3004
+      - HEALING_ENGINE_URL=http://healing-engine:3005
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - auth-service
+      - tenant-manager
+      - ai-orchestrator
+      - test-generator
+      - healing-engine
+    networks:
+      - shifty-network
+
+  # AI Orchestrator Service
+  ai-orchestrator:
+    build:
+      context: .
+      dockerfile: services/ai-orchestrator/Dockerfile
+    container_name: shifty-ai-orchestrator
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - OLLAMA_ENDPOINT=http://ollama:11434
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - platform-db
+      - redis
+      - ollama
+    networks:
+      - shifty-network
+
+  # Test Runner Service
+  test-runner:
+    build:
+      context: .
+      dockerfile: services/test-runner/Dockerfile
+    container_name: shifty-test-runner
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - REDIS_URL=redis://redis:6379
+      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
+    depends_on:
+      - platform-db
+      - redis
+      - ai-orchestrator
+    networks:
+      - shifty-network
+    # Mount Docker socket for container-based test execution
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # Test Generator Service
+  test-generator:
+    build:
+      context: .
+      dockerfile: services/test-generator/Dockerfile
+    container_name: shifty-test-generator
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - OLLAMA_URL=http://ollama:11434
+      - AI_MODEL=llama3.1
+    depends_on:
+      - platform-db
+      - ollama
+    networks:
+      - shifty-network
+
+  # Healing Engine Service
+  healing-engine:
+    build:
+      context: .
+      dockerfile: services/healing-engine/Dockerfile
+    container_name: shifty-healing-engine
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - OLLAMA_URL=http://ollama:11434
+      - AI_MODEL=llama3.1
+    depends_on:
+      - platform-db
+      - ollama
+    networks:
+      - shifty-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: shifty-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - TENANT_MANAGER_URL=http://tenant-manager:3001
+      - AUTH_SERVICE_URL=http://auth-service:3002
+      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
+      - TEST_GENERATOR_URL=http://test-generator:3004
+      - HEALING_ENGINE_URL=http://healing-engine:3005
+      - TEST_RUNNER_URL=http://test-runner:3006
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+      - tenant-manager
+      - auth-service
+      - ai-orchestrator
+      - test-generator
+      - healing-engine
+    networks:
+      - shifty-network
+
+  # Web Frontend
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: shifty-web
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=development
+      - PORT=3010
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - api-gateway
+    networks:
+      - shifty-network
+
+volumes:
+  platform_db_data:
+  redis_data:
+  ollama_models:
+
+networks:
+  shifty-network:
+    driver: bridge

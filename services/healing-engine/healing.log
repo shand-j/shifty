@@ -1,0 +1,7 @@
+
+> @shifty/healing-engine@1.0.0 dev
+> tsx watch src/index.ts
+
+📊 Database Manager initialized
+{"level":30,"time":1760125868426,"pid":99496,"hostname":"Johns-MacBook-Pro-2.local","msg":"Server listening at http://0.0.0.0:3005"}
+🔧 Healing Engine Service running on port 3005

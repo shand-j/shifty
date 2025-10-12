@@ -1,0 +1,58 @@
+# Base Node.js image for all services
+FROM node:18-alpine as base
+
+# Install build dependencies
+RUN apk add --no-cache libc6-compat
+RUN apk update
+
+# Set working directory
+WORKDIR /app
+
+# Install turbo globally
+RUN npm install -g turbo
+
+# Copy workspace files
+COPY package.json package-lock.json turbo.json ./
+COPY packages packages
+COPY services services
+COPY apps apps
+COPY tools tools
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Build stage
+FROM base as builder
+
+# Install all dependencies (including dev)
+RUN npm ci
+
+# Build the entire workspace
+RUN turbo run build
+
+# Production stage template - extend this for each service
+FROM node:18-alpine as production
+
+WORKDIR /app
+
+# Add non-root user
+RUN addgroup --system --gid 1001 shifty
+RUN adduser --system --uid 1001 shifty
+
+# Install production dependencies only
+COPY package.json package-lock.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application
+COPY --from=builder --chown=shifty:shifty /app/dist ./dist
+COPY --from=builder --chown=shifty:shifty /app/node_modules ./node_modules
+
+# Switch to non-root user
+USER shifty
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node dist/healthcheck.js || exit 1
+
+# Default command (override in service-specific Dockerfiles)
+CMD ["node", "dist/index.js"]

@@ -1,0 +1,71 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚀 Debug API Gateway",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/api-gateway/src/index.ts",
+      "outFiles": ["${workspaceFolder}/apps/api-gateway/dist/**/*.js"],
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeArgs": ["-r", "ts-node/register"]
+    },
+    {
+      "name": "🔐 Debug Auth Service",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/services/auth-service/src/index.ts",
+      "outFiles": ["${workspaceFolder}/services/auth-service/dist/**/*.js"],
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeArgs": ["-r", "ts-node/register"]
+    },
+    {
+      "name": "🏢 Debug Tenant Manager",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/services/tenant-manager/src/index.ts",
+      "outFiles": ["${workspaceFolder}/services/tenant-manager/dist/**/*.js"],
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeArgs": ["-r", "ts-node/register"]
+    },
+    {
+      "name": "🤖 Debug AI Orchestrator",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/services/ai-orchestrator/src/index.ts",
+      "outFiles": ["${workspaceFolder}/services/ai-orchestrator/dist/**/*.js"],
+      "envFile": "${workspaceFolder}/.env",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "restart": true,
+      "runtimeArgs": ["-r", "ts-node/register"]
+    },
+    {
+      "name": "🧪 Debug Jest Tests",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/.bin/jest",
+      "args": ["--runInBand", "--no-cache"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "envFile": "${workspaceFolder}/.env.test"
+    }
+  ]
+}

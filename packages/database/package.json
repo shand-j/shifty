@@ -1,0 +1,26 @@
+{
+  "name": "@shifty/database",
+  "version": "1.0.0",
+  "description": "Multi-tenant database management utilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "db:migrate": "node dist/migrations/runner.js",
+    "db:seed": "node dist/seeds/runner.js"
+  },
+  "dependencies": {
+    "@shifty/shared": "file:../shared",
+    "pg": "^8.11.0",
+    "pg-pool": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.10.0",
+    "typescript": "^5.2.0"
+  }
+}

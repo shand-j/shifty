@@ -1,0 +1,92 @@
+{
+  "name": "shifty",
+  "version": "1.0.0",
+  "description": "AI-Powered Multi-Tenant Test Automation Platform",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/ai-framework",
+    "packages/database",
+    "apps/api-gateway",
+    "services/tenant-manager",
+    "services/auth-service",
+    "services/ai-orchestrator",
+    "services/test-generator",
+    "services/healing-engine"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "jest",
+    "test:api": "jest --testPathPattern=tests/api",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "deploy:dev": "turbo run deploy --filter=@shifty/infrastructure",
+    "deploy:prod": "turbo run deploy:prod --filter=@shifty/infrastructure",
+    "setup": "./scripts/setup-local-development.sh",
+    "start": "./scripts/dev.sh",
+    "validate": "./scripts/validate-system.sh",
+    "status": "./scripts/status.sh",
+    "kill": "for port in 3000 3001 3002 3003 3004 3005; do lsof -ti:$port | xargs kill -9 2>/dev/null || true; done",
+    "kill:graceful": "pkill -TERM -f shifty && sleep 3 && pkill -9 -f shifty",
+    "install:all": "npm install",
+    "db:migrate": "turbo run db:migrate",
+    "db:seed": "turbo run db:seed"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^6.0.3",
+    "@types/uuid": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "axios": "^1.6.0",
+    "eslint": "^8.50.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.0.0",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.4.5",
+    "turbo": "^1.10.0",
+    "typescript": "^5.2.0",
+    "uuid": "^9.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "testMatch": [
+      "**/*.test.ts",
+      "**/*.spec.ts"
+    ],
+    "collectCoverageFrom": [
+      "services/**/*.{ts,js}",
+      "apps/**/*.{ts,js}",
+      "packages/**/*.{ts,js}",
+      "!**/*.d.ts",
+      "!**/node_modules/**",
+      "!**/dist/**"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.ts"
+    ],
+    "testTimeout": 30000,
+    "maxWorkers": 1,
+    "forceExit": true,
+    "detectOpenHandles": true
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shifty-ai/shifty.git"
+  },
+  "license": "MIT"
+}

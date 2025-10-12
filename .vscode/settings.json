@@ -1,0 +1,161 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/coverage": true,
+    "**/test-results": true,
+    "**/*.log": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true,
+    "**/test-results": true
+  },
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.suggest.autoImports": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "todohighlight.keywords": [
+    {
+      "text": "TODO:",
+      "color": "#ff6b6b",
+      "backgroundColor": "rgba(255, 107, 107, 0.1)",
+      "borderRadius": "2px"
+    },
+    {
+      "text": "FIXME:",
+      "color": "#feca57",
+      "backgroundColor": "rgba(254, 202, 87, 0.1)",
+      "borderRadius": "2px"
+    },
+    {
+      "text": "HACK:",
+      "color": "#ff9ff3",
+      "backgroundColor": "rgba(255, 159, 243, 0.1)",
+      "borderRadius": "2px"
+    },
+    {
+      "text": "XXX:",
+      "color": "#ff6348",
+      "backgroundColor": "rgba(255, 99, 72, 0.1)",
+      "borderRadius": "2px"
+    },
+    {
+      "text": "MOCK:",
+      "color": "#ff9500",
+      "backgroundColor": "rgba(255, 149, 0, 0.1)",
+      "borderRadius": "2px"
+    },
+    {
+      "text": "DEBUG:",
+      "color": "#70a1ff",
+      "backgroundColor": "rgba(112, 161, 255, 0.1)",
+      "borderRadius": "2px"
+    }
+  ],
+  "todohighlight.include": [
+    "**/*.ts",
+    "**/*.js",
+    "**/*.tsx",
+    "**/*.jsx",
+    "**/*.json",
+    "**/*.md"
+  ],
+  "todohighlight.exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**"
+  ],
+  "todo-tree.highlights.enabled": true,
+  "todo-tree.highlights.defaultHighlight": {
+    "type": "text-and-comment"
+  },
+  "todo-tree.highlights.customHighlight": {
+    "TODO": {
+      "foreground": "#ff6b6b",
+      "background": "rgba(255, 107, 107, 0.1)",
+      "iconColour": "#ff6b6b",
+      "icon": "alert"
+    },
+    "FIXME": {
+      "foreground": "#feca57",
+      "background": "rgba(254, 202, 87, 0.1)",
+      "iconColour": "#feca57",
+      "icon": "bug"
+    },
+    "HACK": {
+      "foreground": "#ff9ff3",
+      "background": "rgba(255, 159, 243, 0.1)",
+      "iconColour": "#ff9ff3",
+      "icon": "tools"
+    },
+    "XXX": {
+      "foreground": "#ff6348",
+      "background": "rgba(255, 99, 72, 0.1)",
+      "iconColour": "#ff6348",
+      "icon": "flame"
+    },
+    "MOCK": {
+      "foreground": "#ff9500",
+      "background": "rgba(255, 149, 0, 0.1)",
+      "iconColour": "#ff9500",
+      "icon": "package"
+    }
+  },
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "XXX",
+    "MOCK",
+    "DEBUG",
+    "NOTE",
+    "REVIEW"
+  ],
+  "todo-tree.regex.regex": "(//|#|<!--|;|/\\*|^|^[ \\t]*(-|\\*))\\s*($TAGS)",
+  "git.ignoreLimitWarning": true,
+  "emmet.includeLanguages": {
+    "typescript": "html"
+  },
+  "jest.jestCommandLine": "npm test",
+  "jest.autoRun": {
+    "watch": false,
+    "onSave": "test-src-file"
+  },
+  "problems.decorations.enabled": true,
+  "explorer.compactFolders": false,
+  "breadcrumbs.enabled": true,
+  "outline.showVariables": true,
+  "workbench.editor.enablePreview": false,
+  "workbench.startupEditor": "none",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "debug.console.wordWrap": true,
+  "editor.minimap.enabled": true,
+  "editor.minimap.showSlider": "always",
+  "editor.rulers": [80, 120],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": true,
+  "npm.enableRunFromFolder": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "sonarlint.connectedMode.project": {
+    "connectionId": "",
+    "projectKey": ""
+  }
+}

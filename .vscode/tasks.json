@@ -22,7 +22,7 @@
     },
     {
       "label": "✅ Validate MVP",
-      "type": "shell", 
+      "type": "shell",
       "command": "./scripts/validate-mvp.sh",
       "group": "test",
       "presentation": {
@@ -43,7 +43,7 @@
       "group": "test",
       "presentation": {
         "echo": true,
-        "reveal": "always", 
+        "reveal": "always",
         "focus": false,
         "panel": "new"
       },
@@ -60,7 +60,7 @@
       "presentation": {
         "echo": true,
         "reveal": "always",
-        "focus": false, 
+        "focus": false,
         "panel": "new"
       },
       "options": {
@@ -71,7 +71,7 @@
     {
       "label": "🔍 Search Hardcoded Values",
       "type": "shell",
-      "command": "grep -r --include='*.ts' --include='*.js' 'localhost\\|127\\.0\\.0\\.1\\|hardcoded\\|TODO.*config' . --color=always | head -15", 
+      "command": "grep -r --include='*.ts' --include='*.js' 'localhost\\|127\\.0\\.0\\.1\\|hardcoded\\|TODO.*config' . --color=always | head -15",
       "group": "test",
       "presentation": {
         "echo": true,
@@ -88,7 +88,7 @@
       "label": "📋 Generate Tech Debt Report",
       "type": "shell",
       "command": "echo '=== TECH DEBT SUMMARY ===' && echo 'TODOs:' && grep -r 'TODO' --include='*.ts' --include='*.js' . | wc -l && echo 'FIXMEs:' && grep -r 'FIXME' --include='*.ts' --include='*.js' . | wc -l && echo 'Mocks in Prod:' && grep -r 'mock' --include='*.ts' --include='*.js' --exclude-dir=tests . | wc -l && echo 'Hardcoded localhost:' && grep -r 'localhost' --include='*.ts' --include='*.js' . | wc -l",
-      "group": "test", 
+      "group": "test",
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -120,7 +120,7 @@
       "problemMatcher": ["$tsc"]
     },
     {
-      "label": "🧪 Run API Tests Only", 
+      "label": "🧪 Run API Tests Only",
       "type": "shell",
       "command": "npm run test:api",
       "group": "test",
@@ -137,7 +137,7 @@
     },
     {
       "label": "🧪 Run Integration Tests Only",
-      "type": "shell", 
+      "type": "shell",
       "command": "npm run test:integration",
       "group": "test",
       "presentation": {
@@ -152,7 +152,7 @@
       "problemMatcher": ["$tsc"]
     },
     {
-      "label": "📦 Install Dependencies", 
+      "label": "📦 Install Dependencies",
       "type": "shell",
       "command": "npm install",
       "group": "build",
@@ -171,7 +171,7 @@
       "label": "🔨 Build All Services",
       "type": "shell",
       "command": "npm run build",
-      "group": "build", 
+      "group": "build",
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -189,7 +189,7 @@
       "command": "docker-compose up -d",
       "group": "build",
       "presentation": {
-        "echo": true, 
+        "echo": true,
         "reveal": "always",
         "focus": false,
         "panel": "new"
@@ -206,7 +206,7 @@
       "group": "build",
       "presentation": {
         "echo": true,
-        "reveal": "always", 
+        "reveal": "always",
         "focus": false,
         "panel": "new"
       },
@@ -246,6 +246,54 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "📊 Run SonarQube Analysis",
+      "type": "shell",
+      "command": "npm run sonar:local",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📈 Generate Coverage Report",
+      "type": "shell",
+      "command": "npm run test:coverage && echo '✅ Coverage report generated in ./coverage/lcov-report/index.html'",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Quality Check (All)",
+      "type": "shell",
+      "command": "npm run quality:check",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$tsc", "$eslint-stylish"]
     }
   ]
 }

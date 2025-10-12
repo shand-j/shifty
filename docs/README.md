@@ -5,54 +5,65 @@ This directory contains all project documentation organized for developers, test
 ## 🗂️ Documentation Index
 
 ### 🚀 Getting Started
+
 - **[Quick Start Guide](./getting-started/quick-start.md)** - Get Shifty running locally in minutes
 - **[Installation Guide](./getting-started/installation.md)** - Detailed setup instructions
 - **[Development Environment](./getting-started/development-setup.md)** - Developer environment configuration
 
 ### 🏗️ Architecture & Design
+
 - **[System Architecture](./architecture/system-overview.md)** - High-level system design
 - **[API Reference](./architecture/api-reference.md)** - Complete API documentation
 - **[Database Schema](./architecture/database-schema.md)** - Database structure and relationships
 - **[Service Dependencies](./architecture/service-dependencies.md)** - Inter-service communication
 
 ### 👩‍💻 Developer Resources
+
 - **[Development Guide](./development/developer-guide.md)** - Comprehensive development documentation
+- **[Deployment Guide](./development/deployment.md)** - Local, staging, and production deployment
+- **[SonarQube Coverage](./development/sonarqube-coverage.md)** - Test coverage analysis with SonarQube
+- **[Jest Test Explorer Fix](./development/jest-test-explorer-fix.md)** - ✅ RESOLVED: VS Code Jest integration troubleshooting
 - **[Contributing Guidelines](./development/contributing.md)** - How to contribute to the project
 - **[Code Style Guide](./development/code-style.md)** - Coding standards and best practices
 - **[Testing Strategy](./development/testing-strategy.md)** - Testing approach and guidelines
 
 ### 🧪 Testing Documentation
+
 - **[Test Coverage Report](./testing/test-coverage.md)** - Current test coverage status
 - **[Manual Testing Guide](./testing/manual-testing.md)** - Manual testing procedures
 - **[API Testing](./testing/api-testing.md)** - API testing documentation
 - **[Integration Testing](./testing/integration-testing.md)** - End-to-end testing guide
 
 ### 🚀 Deployment & Operations
+
 - **[Deployment Guide](./deployment/deployment-guide.md)** - Production deployment instructions
 - **[Environment Configuration](./deployment/environment-config.md)** - Environment setup
 - **[Monitoring & Logging](./deployment/monitoring.md)** - Observability setup
 - **[Troubleshooting](./deployment/troubleshooting.md)** - Common issues and solutions
 
 ### 📋 Project Management
+
 - **[Tech Debt Backlog](./project-management/tech-debt-backlog.md)** - Technical debt tracking
 - **[Feature Roadmap](./project-management/roadmap.md)** - Project roadmap and milestones
 - **[Project Status](./project-management/project-status.md)** - Current project status
 - **[Release Notes](./project-management/release-notes.md)** - Version history and changes
 
 ### 🔒 Security & Compliance
+
 - **[Security Guidelines](./security/security-guidelines.md)** - Security best practices
 - **[Data Privacy](./security/data-privacy.md)** - Privacy and compliance documentation
 
 ## 🔍 Quick Navigation
 
-| Need | Document |
-|------|----------|
-| **Start developing** | [Development Guide](./development/developer-guide.md) |
-| **Run tests** | [Testing Strategy](./development/testing-strategy.md) |
-| **Deploy to production** | [Deployment Guide](./deployment/deployment-guide.md) |
-| **Understand architecture** | [System Architecture](./architecture/system-overview.md) |
-| **View project status** | [Project Status](./project-management/project-status.md) |
-| **See tech debt** | [Tech Debt Backlog](./project-management/tech-debt-backlog.md) |
+| Need                        | Document                                                          |
+| --------------------------- | ----------------------------------------------------------------- |
+| **Start developing**        | [Development Guide](./development/developer-guide.md)             |
+| **Run tests**               | [Testing Strategy](./development/testing-strategy.md)             |
+| **Fix Jest in VS Code**     | [Jest Test Explorer Fix](./development/jest-test-explorer-fix.md) |
+| **Deploy to production**    | [Deployment Guide](./deployment/deployment-guide.md)              |
+| **Understand architecture** | [System Architecture](./architecture/system-overview.md)          |
+| **View project status**     | [Project Status](./project-management/project-status.md)          |
+| **See tech debt**           | [Tech Debt Backlog](./project-management/tech-debt-backlog.md)    |
 
 ## 📝 Documentation Standards
 
@@ -72,5 +83,5 @@ This directory contains all project documentation organized for developers, test
 
 ---
 
-**Last Updated:** $(date +%Y-%m-%d)  
+**Last Updated:** $(date +%Y-%m-%d)
 **Maintained by:** Shifty Development Team

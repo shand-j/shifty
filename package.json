@@ -22,9 +22,14 @@
     "test:integration": "jest --testPathPattern=tests/integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:coverage:sonar": "jest --coverage --coverageReporters=lcov --coverageReporters=text",
+    "sonar": "sonar-scanner",
+    "sonar:local": "npm run test:coverage:sonar && sonar-scanner",
+    "quality:check": "npm run test:coverage && npm run lint && npm run type-check",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "clean": "turbo run clean",
+    "clean:coverage": "rm -rf coverage",
     "deploy:dev": "turbo run deploy --filter=@shifty/infrastructure",
     "deploy:prod": "turbo run deploy:prod --filter=@shifty/infrastructure",
     "setup": "./scripts/setup-local-development.sh",
@@ -47,38 +52,13 @@
     "axios": "^1.6.0",
     "eslint": "^8.50.0",
     "jest": "^29.7.0",
+    "jest-junit": "^16.0.0",
     "prettier": "^3.0.0",
     "supertest": "^6.3.4",
     "ts-jest": "^29.4.5",
     "turbo": "^1.10.0",
     "typescript": "^5.2.0",
     "uuid": "^9.0.0"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/tests"
-    ],
-    "testMatch": [
-      "**/*.test.ts",
-      "**/*.spec.ts"
-    ],
-    "collectCoverageFrom": [
-      "services/**/*.{ts,js}",
-      "apps/**/*.{ts,js}",
-      "packages/**/*.{ts,js}",
-      "!**/*.d.ts",
-      "!**/node_modules/**",
-      "!**/dist/**"
-    ],
-    "setupFilesAfterEnv": [
-      "<rootDir>/tests/setup.ts"
-    ],
-    "testTimeout": 30000,
-    "maxWorkers": 1,
-    "forceExit": true,
-    "detectOpenHandles": true
   },
   "engines": {
     "node": ">=18.0.0",

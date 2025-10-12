@@ -54,14 +54,14 @@ class APIGateway {
   async start() {
     try {
       await this.redis.connect();
-      
+
       await this.registerMiddleware();
       await this.registerRoutes();
       await this.registerProxies();
 
       const port = parseInt(process.env.PORT || '3000', 10);
       await fastify.listen({ port, host: '0.0.0.0' });
-      
+
       console.log(`🌐 API Gateway running on port ${port}`);
       console.log('📡 Registered services:', this.services.map(s => s.prefix));
     } catch (error) {
@@ -137,7 +137,7 @@ class APIGateway {
         status: 'healthy',
         service: 'api-gateway',
         timestamp: new Date().toISOString(),
-        services: serviceHealth.map(result => 
+        services: serviceHealth.map(result =>
           result.status === 'fulfilled' ? result.value : {
             service: 'unknown',
             status: 'error'
@@ -187,7 +187,7 @@ class APIGateway {
 
       const healthyCount = Object.values(services).filter((s: any) => s.status === 'healthy').length;
       const totalCount = Object.keys(services).length;
-      
+
       let overall_status;
       if (healthyCount === totalCount) {
         overall_status = 'healthy';
@@ -209,7 +209,7 @@ class APIGateway {
       // Basic metrics for MVP
       return {
         requests: {
-          total: Math.floor(Math.random() * 1000) + 100, // Mock data for MVP
+          total: Math.floor(Math.random() * 1000) + 100, // MOCK: data for MVP
           rate: Math.floor(Math.random() * 50) + 10 + ' req/min'
         },
         responses: {
@@ -242,14 +242,14 @@ class APIGateway {
     // Authentication middleware
     fastify.addHook('preHandler', async (request, reply) => {
       try {
-        const service = this.services.find(s => 
+        const service = this.services.find(s =>
           request.url.startsWith(s.prefix)
         );
 
         if (service?.requiresAuth) {
           try {
             await request.jwtVerify();
-            
+
             // Add tenant context to request headers
             const payload = request.user as any;
             if (payload) {
@@ -257,7 +257,7 @@ class APIGateway {
               request.headers['x-user-id'] = payload.userId;
               request.headers['x-user-role'] = payload.role;
             }
-            
+
           } catch (jwtErr: any) {
             console.log('JWT verification failed:', jwtErr.message);
             return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or missing token' });
@@ -279,9 +279,9 @@ class APIGateway {
         replyOptions: {
           onError: (reply, error) => {
             console.error(`Proxy error for ${service.prefix}:`, error);
-            reply.status(503).send({ 
+            reply.status(503).send({
               error: 'Service unavailable',
-              service: service.prefix 
+              service: service.prefix
             });
           }
         }

@@ -129,10 +129,20 @@
   "emmet.includeLanguages": {
     "typescript": "html"
   },
-  "jest.jestCommandLine": "npm test",
+  "jest.jestCommandLine": "npx jest",
   "jest.autoRun": {
     "watch": false,
     "onSave": "test-src-file"
+  },
+  "jest.rootPath": ".",
+  "jest.disabledWorkspaceFolders": [],
+  "jest.pathToJest": "./node_modules/.bin/jest",
+  "jest.pathToConfig": "./jest.config.js",
+  "jest.runMode": "on-demand",
+  "jest.outputConfig": {
+    "revealOutput": "on-run",
+    "revealWithFocus": "test-results",
+    "clearOnRun": "none"
   },
   "problems.decorations.enabled": true,
   "explorer.compactFolders": false,
@@ -155,7 +165,7 @@
   "typescript.updateImportsOnFileMove.enabled": "always",
   "javascript.updateImportsOnFileMove.enabled": "always",
   "sonarlint.connectedMode.project": {
-    "connectionId": "",
-    "projectKey": ""
+    "connectionId": "shand-j",
+    "projectKey": "shand-j_shifty"
   }
 }

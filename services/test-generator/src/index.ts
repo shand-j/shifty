@@ -40,6 +40,9 @@ const extractTenantFromAuth = (request: any) => {
 
   try {
     const token = authHeader.split(' ')[1];
+    // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
+    // FIXME: Centralize with other services, use shared secret manager
+    // Effort: 30 minutes | Priority: CRITICAL
     const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
     const decoded = jwt.verify(token, jwtSecret) as any;
     return decoded.tenantId || 'default-tenant';
@@ -120,15 +123,18 @@ class TestGeneratorService {
   }
 
   private async registerRoutes() {
-    // Health check
+    // MEDIUM: Health endpoint publicly exposed - information disclosure
+    // FIXME: Reveals AI model info, Ollama status to public
+    // See auth-service comments for implementation details
+    // Effort: 4 hours | Priority: MEDIUM
     fastify.get('/health', async () => {
       const aiHealth = await this.testGenerator.healthCheck();
       
       return {
-        status: 'healthy',
+        status: aiHealth.status === 'healthy' ? 'healthy' : 'degraded',
         service: 'test-generator',
-        timestamp: new Date().toISOString(),
-        ai: aiHealth
+        ai: aiHealth,
+        timestamp: new Date().toISOString()
       };
     });
 
@@ -356,7 +362,14 @@ class TestGeneratorService {
     tenantId: string,
     request: any
   ): Promise<void> {
-    // This would integrate with the database
+    // HIGH: No database persistence - data not stored
+    // FIXME: Console logs instead of database writes
+    // TODO: Implement real database storage:
+    //   1. Use DatabaseManager.getTenantPool(tenantId)
+    //   2. INSERT into test_generation_requests table
+    //   3. Add proper error handling and retries
+    // Impact: No generation history, no analytics, tenant isolation broken
+    // Effort: 1 day | Priority: HIGH
     console.log(`Creating generation request ${id} for tenant ${tenantId}`);
     
     // For MVP, we'll use in-memory storage
@@ -369,6 +382,10 @@ class TestGeneratorService {
     code?: string,
     additional?: any
   ): Promise<void> {
+    // HIGH: No database updates - status not persisted
+    // FIXME: Status updates lost, no progress tracking
+    // TODO: UPDATE test_generation_requests SET status = $1 WHERE id = $2
+    // Effort: 1 day | Priority: HIGH
     console.log(`Updating generation request ${id} status to ${status}`);
     
     // For MVP, this would update the database

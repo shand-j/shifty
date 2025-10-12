@@ -269,8 +269,15 @@ export async function aiRoutes(
         return reply.status(401).send({ error: 'Tenant ID required' });
       }
 
-      // For MVP, return mock analytics
-      // In production, this would query real data
+      // HIGH: Mock analytics - AI insights are fake
+      // FIXME: Returns hardcoded data, doesn't reflect actual AI usage
+      // TODO: Implement real analytics collection:
+      //   1. Track all AI requests in database (tenant_id, timestamp, model, tokens)
+      //   2. Calculate actual success rates from test_generation_requests table
+      //   3. Store confidence scores and aggregate them
+      //   4. Track healing success rate from healing_attempts table
+      // Impact: Platform appears intelligent but provides fake insights
+      // Effort: 3 days | Priority: HIGH
       const analytics = {
         testGeneration: {
           totalGenerated: 0,

@@ -8,7 +8,15 @@ class DatabaseManager {
         this.tenantPools = new Map();
     }
     async initialize() {
-        // Initialize platform database connection
+        // CRITICAL: Hardcoded database credentials - SECURITY VULNERABILITY
+        // FIXME: Remove hardcoded credentials immediately before production
+        // TODO: Implement proper secret management:
+        //   1. Use AWS Secrets Manager or HashiCorp Vault
+        //   2. Fail startup if DATABASE_URL not set in production
+        //   3. Add env validation: if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) throw new Error('DATABASE_URL required')
+        //   4. Rotate credentials and update all references
+        // Impact: Any attacker can access entire platform database
+        // Effort: 2 hours | Priority: CRITICAL
         this.platformPool = new pg_1.Pool({
             connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/shifty_platform',
             max: 20,

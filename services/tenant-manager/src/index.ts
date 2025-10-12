@@ -27,8 +27,13 @@ class TenantManagerApp {
   }
 
   private initializeMiddleware() {
-    // Security middleware
+    // MEDIUM: Express security middleware not optimally configured
+    // FIXME: Using defaults, no custom CSP, HSTS, or frame options
+    // TODO: Harden helmet configuration with strict CSP
+    // Effort: 4 hours | Priority: MEDIUM
     this.app.use(helmet());
+    // MEDIUM: CORS configuration - see API Gateway comments
+    // Effort: 2 hours | Priority: MEDIUM
     this.app.use(cors({
       origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
       credentials: true
@@ -37,7 +42,10 @@ class TenantManagerApp {
     // Performance middleware
     this.app.use(compression());
 
-    // Rate limiting
+    // HIGH: In-memory rate limiting - doesn't scale
+    // FIXME: Rate limits reset on restart, no distributed state
+    // TODO: Use Redis-backed rate limiting for multi-instance deployments
+    // Effort: 1 day | Priority: HIGH
     const limiter = rateLimit({
       windowMs: process.env.NODE_ENV === 'test' ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 min for test, 15 min for production
       max: process.env.NODE_ENV === 'test' ? 1000 : 100, // Much more permissive for testing

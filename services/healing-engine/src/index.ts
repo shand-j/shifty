@@ -140,15 +140,18 @@ class HealingEngineService {
   }
 
   private async registerRoutes() {
-    // Health check
+    // MEDIUM: Health endpoint publicly exposed - information disclosure
+    // FIXME: Reveals browser availability, healing strategies to public
+    // See auth-service comments for implementation details
+    // Effort: 4 hours | Priority: MEDIUM
     fastify.get('/health', async () => {
-      const aiHealth = await this.selectorHealer.healthCheck();
+      const healerHealth = await this.selectorHealer.healthCheck();
       
       return {
-        status: 'healthy',
+        status: healerHealth.status,
         service: 'healing-engine',
-        timestamp: new Date().toISOString(),
-        ai: aiHealth
+        healer: healerHealth,
+        timestamp: new Date().toISOString()
       };
     });
 
@@ -161,6 +164,9 @@ class HealingEngineService {
 
       try {
         const token = authHeader.split(' ')[1];
+        // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
+        // FIXME: Centralize with other services, use shared secret manager
+        // Effort: 30 minutes | Priority: CRITICAL
         const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
         const decoded = jwt.verify(token, jwtSecret) as any;
         return decoded.tenantId || 'default-tenant';
@@ -172,7 +178,15 @@ class HealingEngineService {
     // Heal a single selector
     fastify.post('/api/v1/healing/heal-selector', async (request, reply) => {
       try {
-        // Try JWT auth first, fall back to header
+        // CRITICAL: No input validation on healing request
+        // FIXME: url, brokenSelector can contain malicious payloads
+        // TODO: Add validation:
+        //   1. Validate URL format and whitelist allowed domains
+        //   2. Sanitize selector strings (prevent code injection)
+        //   3. Limit request size and complexity
+        //   4. Add rate limiting per tenant
+        // Impact: XSS, SSRF, DoS attacks possible
+        // Effort: 4 hours | Priority: CRITICAL
         let tenantId = extractTenantFromAuth(request);
         if (!tenantId) {
           tenantId = request.headers['x-tenant-id'] as string;
@@ -193,7 +207,15 @@ class HealingEngineService {
 
         const startTime = Date.now();
 
-        // For test environment and example.com URLs, use mock healing without browser
+        // CRITICAL: Mock healing logic in production code path
+        // FIXME: This makes platform appear to work but delivers zero value
+        // TODO: Remove mock path completely, implement real healing:
+        //   1. Actually launch browser and navigate to URL
+        //   2. Execute real healing strategies (DOM analysis, visual similarity)
+        //   3. Validate healed selectors work on live page
+        //   4. Store results in database with tenant isolation
+        // Impact: Core feature doesn't work - platform is fake
+        // Effort: 1 week | Priority: CRITICAL
         if (process.env.NODE_ENV === 'test' && body.url.includes('example.com')) {
           const mockHealingResult = this.getMockHealingResult(body.brokenSelector, body.strategy);
           const executionTime = Date.now() - startTime;
@@ -584,6 +606,15 @@ class HealingEngineService {
   }
 
   private async getBrowser(browserType: 'chromium' | 'firefox' | 'webkit') {
+    // HIGH: No browser cleanup - memory leak risk
+    // FIXME: Browser instances never closed, will exhaust memory
+    // TODO: Implement browser pool with lifecycle management:
+    //   1. Create BrowserPool class with max size (e.g., 10)
+    //   2. Reuse browsers with TTL (close after 5 minutes idle)
+    //   3. Add cleanup on service shutdown
+    //   4. Track active browsers, close oldest when limit reached
+    // Impact: Memory leaks, resource exhaustion, service crashes
+    // Effort: 2 days | Priority: HIGH
     switch (browserType) {
       case 'firefox':
         return await firefox.launch({ headless: true });
@@ -642,6 +673,15 @@ class HealingEngineService {
   }
 
   private async logHealingAttempt(tenantId: string, attempt: any): Promise<void> {
+    // HIGH: No database persistence - tenant data not stored
+    // FIXME: Console logs disappear on restart, no analytics possible
+    // TODO: Implement real database writes:
+    //   1. Use DatabaseManager.getTenantPool(tenantId)
+    //   2. INSERT into healing_attempts table with all attempt data
+    //   3. Add proper error handling and retries
+    //   4. Ensure tenant isolation (separate schemas/databases)
+    // Impact: Multi-tenancy doesn't work, no audit trail, no analytics
+    // Effort: 1 day | Priority: HIGH
     console.log(`Logging healing attempt for tenant ${tenantId}:`, attempt);
     
     // For MVP, we'll use console logging
@@ -649,6 +689,15 @@ class HealingEngineService {
   }
 
   private async getHealingStats(tenantId: string): Promise<any> {
+    // HIGH: Mock analytics - dashboard shows fake data
+    // FIXME: Returns random data, not actual tenant metrics
+    // TODO: Query real database for stats:
+    //   1. SELECT COUNT(*), AVG(execution_time), success_rate FROM healing_attempts WHERE tenant_id = $1
+    //   2. GROUP BY strategy to get mostCommonStrategies
+    //   3. Join with tests table to get affectedTests
+    //   4. Add time-range filters for trending
+    // Impact: Platform appears to work but provides no real insights
+    // Effort: 2 days | Priority: HIGH
     console.log(`Getting healing stats for tenant ${tenantId}`);
     
     // For MVP, return mock stats

@@ -133,3 +133,6 @@ export const AiConfigSchema = z.object({
 });
 
 export type AiConfig = z.infer<typeof AiConfigSchema>;
+
+// Export Enterprise Types
+export * from './enterprise';

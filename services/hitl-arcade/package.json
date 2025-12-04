@@ -1,0 +1,30 @@
+{
+  "name": "@shifty/hitl-arcade",
+  "version": "1.0.0",
+  "description": "Human-in-the-Loop Arcade Service for Gamified Model Training Data Collection",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "lint": "eslint src --ext .ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@shifty/shared": "*",
+    "@shifty/database": "*",
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.1",
+    "@fastify/rate-limit": "^8.1.0",
+    "@fastify/websocket": "^8.3.1",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.2.0",
+    "ts-node": "^10.9.0"
+  }
+}

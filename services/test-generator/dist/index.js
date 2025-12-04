@@ -73,6 +73,9 @@ const extractTenantFromAuth = (request) => {
     }
     try {
         const token = authHeader.split(' ')[1];
+        // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
+        // FIXME: Centralize with other services, use shared secret manager
+        // Effort: 30 minutes | Priority: CRITICAL
         const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
         const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
         return decoded.tenantId || 'default-tenant';
@@ -111,7 +114,7 @@ class TestGeneratorService {
         await fastify.register(Promise.resolve().then(() => __importStar(require('@fastify/helmet'))));
         // Configure rate limiting based on environment
         const rateLimit = process.env.NODE_ENV === 'test' ? {
-            max: 100, // More permissive for testing
+            max: 1000, // More permissive for testing
             timeWindow: '1 minute',
             skipOnError: true,
             skipSuccessfulRequests: false,
@@ -120,7 +123,7 @@ class TestGeneratorService {
                 return req.url === '/health' || req.url === '/api/v1/health';
             }
         } : {
-            max: 30, // Production limit - increased from 10
+            max: 500, // Production limit - increased significantly
             timeWindow: '1 minute',
             allowList: (req) => {
                 // Exclude health checks from rate limiting in production too
@@ -130,14 +133,17 @@ class TestGeneratorService {
         await fastify.register(Promise.resolve().then(() => __importStar(require('@fastify/rate-limit'))), rateLimit);
     }
     async registerRoutes() {
-        // Health check
+        // MEDIUM: Health endpoint publicly exposed - information disclosure
+        // FIXME: Reveals AI model info, Ollama status to public
+        // See auth-service comments for implementation details
+        // Effort: 4 hours | Priority: MEDIUM
         fastify.get('/health', async () => {
             const aiHealth = await this.testGenerator.healthCheck();
             return {
-                status: 'healthy',
+                status: aiHealth.status === 'healthy' ? 'healthy' : 'degraded',
                 service: 'test-generator',
-                timestamp: new Date().toISOString(),
-                ai: aiHealth
+                ai: aiHealth,
+                timestamp: new Date().toISOString()
             };
         });
         // Generate test from requirements
@@ -320,12 +326,23 @@ class TestGeneratorService {
         }
     }
     async createGenerationRequest(id, tenantId, request) {
-        // This would integrate with the database
+        // HIGH: No database persistence - data not stored
+        // FIXME: Console logs instead of database writes
+        // TODO: Implement real database storage:
+        //   1. Use DatabaseManager.getTenantPool(tenantId)
+        //   2. INSERT into test_generation_requests table
+        //   3. Add proper error handling and retries
+        // Impact: No generation history, no analytics, tenant isolation broken
+        // Effort: 1 day | Priority: HIGH
         console.log(`Creating generation request ${id} for tenant ${tenantId}`);
         // For MVP, we'll use in-memory storage
         // In production, this would use the database
     }
     async updateGenerationStatus(id, status, code, additional) {
+        // HIGH: No database updates - status not persisted
+        // FIXME: Status updates lost, no progress tracking
+        // TODO: UPDATE test_generation_requests SET status = $1 WHERE id = $2
+        // Effort: 1 day | Priority: HIGH
         console.log(`Updating generation request ${id} status to ${status}`);
         // For MVP, this would update the database
         // Implementation would store in the tenant's database

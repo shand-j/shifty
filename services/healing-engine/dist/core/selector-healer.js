@@ -42,6 +42,15 @@ class SelectorHealer {
                     };
                 }
             }
+            // HIGH: All healing strategies return mock/failure
+            // FIXME: Strategies not implemented, always returns 'all-strategies-failed'
+            // TODO: Implement actual healing logic:
+            //   1. data-testid-recovery: scan DOM for data-testid attributes
+            //   2. text-content-matching: find elements by visible text
+            //   3. css-hierarchy-analysis: analyze DOM tree structure
+            //   4. ai-powered-analysis: use Ollama to suggest alternatives
+            // Impact: Core feature doesn't work, no actual healing occurs
+            // Effort: 1 week | Priority: HIGH
             return {
                 success: false,
                 selector: brokenSelector,
@@ -191,7 +200,16 @@ class SelectorHealer {
     }
     async tryTextContentMatching(page, brokenSelector) {
         try {
-            // For test scenarios (example.com URLs), simulate successful healing
+            // HIGH: Mock healing for test URLs - not real implementation
+            // FIXME: Only works for example.com, returns hardcoded results
+            // TODO: Implement real text content matching:
+            //   1. Use page.locator('*').all() to get all elements
+            //   2. Extract text content with element.textContent()
+            //   3. Match against expected text patterns
+            //   4. Score candidates by text similarity (Levenshtein distance)
+            //   5. Return best match with confidence score
+            // Impact: Healing doesn't work on real applications
+            // Effort: 3 days | Priority: HIGH
             const pageUrl = page.url();
             if (pageUrl.includes('example.com') && brokenSelector === '#broken-submit-btn') {
                 return {

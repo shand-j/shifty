@@ -1,4 +1,14 @@
 "use strict";
+// MEDIUM: console.log throughout production code - no structured logging
+// FIXME: Logs are unstructured, no correlation IDs, log levels, or persistence
+// TODO: Replace all console.log with proper logger (Winston/Pino):
+//   1. Add correlation IDs to all log statements
+//   2. Use log levels (debug, info, warn, error)
+//   3. Structure logs as JSON for parsing
+//   4. Send to centralized logging (CloudWatch, Datadog, ELK)
+// Impact: Hard to debug, no production observability
+// Effort: 2 days | Priority: MEDIUM
+// NOTE: This applies to ALL services with console.log
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TestGenerator = void 0;
 class TestGenerator {
@@ -219,6 +229,15 @@ Return only the enhanced TypeScript code.`;
             /page\.getByTestId\(['"`]([^'"`]+)['"`]/g,
             /page\.getByText\(['"`]([^'"`]+)['"`]/g
         ];
+        // MEDIUM: Naive selector extraction - misses complex cases
+        // FIXME: Doesn't handle template literals, dynamic selectors, chained locators
+        // TODO: Improve extraction:
+        //   1. Parse AST using @babel/parser for accuracy
+        //   2. Handle page.locator().locator() chains
+        //   3. Extract selectors from helper functions
+        //   4. Support page.frameLocator() and shadow DOM
+        // Impact: Incomplete test analysis, missing healing opportunities
+        // Effort: 3 days | Priority: MEDIUM
         const selectors = [];
         for (const pattern of patterns) {
             let match;
@@ -229,6 +248,16 @@ Return only the enhanced TypeScript code.`;
         return [...new Set(selectors)];
     }
     estimateExecutionTime(code) {
+        // MEDIUM: Naive execution time estimation
+        // FIXME: Doesn't account for network latency, page load time, element wait times
+        // TODO: Improve estimation algorithm:
+        //   1. Add network delay factor (2-5s per request)
+        //   2. Parse page.goto() and add typical page load time (3-8s)
+        //   3. Count page.waitFor*() and add their timeout values
+        //   4. Factor in screenshot/video recording overhead
+        //   5. Use historical data from actual test runs
+        // Impact: Misleading time estimates, poor capacity planning
+        // Effort: 3 days | Priority: MEDIUM
         const lines = code.split('\n').length;
         const interactions = (code.match(/page\.(click|fill|type|goto)/g) || []).length;
         const waits = (code.match(/waitFor/g) || []).length;
@@ -253,7 +282,15 @@ test('{{TEST_NAME}}', async ({ page }) => {
   // Verify page loads successfully
   await expect(page).toHaveTitle(/{{DOMAIN}}/i);
   
-  // TODO: Add specific test steps based on requirements
+  // HIGH: Incomplete test generation - generates boilerplate only
+  // FIXME: Core feature doesn't deliver value, tests are empty shells
+  // TODO: Implement actual test step generation:
+  //   1. Parse requirements to extract actions (click, fill, verify)
+  //   2. Use AI to generate specific Playwright assertions
+  //   3. Add proper selectors based on page analysis
+  //   4. Include data-testid recommendations
+  // Impact: Primary value proposition doesn't work
+  // Effort: 1-2 weeks | Priority: HIGH
   console.log('✅ Test completed successfully');
 });`,
             integration: `import { test, expect } from '@playwright/test';

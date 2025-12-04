@@ -61,6 +61,10 @@ const LoginSchema = zod_1.z.object({
 class AuthService {
     constructor() {
         this.dbManager = new database_1.DatabaseManager();
+        // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
+        // FIXME: Must be changed before production or all auth is compromised
+        // TODO: See api-gateway JWT secret fix for implementation steps
+        // Effort: 30 minutes | Priority: CRITICAL
         this.jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
     }
     async start() {
@@ -84,12 +88,20 @@ class AuthService {
         });
         await fastify.register(Promise.resolve().then(() => __importStar(require('@fastify/helmet'))));
         await fastify.register(Promise.resolve().then(() => __importStar(require('@fastify/rate-limit'))), {
-            max: 50,
+            max: 1000,
             timeWindow: '1 minute'
         });
     }
     async registerRoutes() {
-        // Health check
+        // MEDIUM: Health endpoint publicly exposed - information disclosure
+        // FIXME: No authentication, reveals service name, version, internal status
+        // TODO: Add authentication or move to internal network:
+        //   1. Add API key validation for health checks
+        //   2. Only expose /health to load balancer IP range
+        //   3. Separate public /status (minimal info) from internal /health (detailed)
+        //   4. Remove detailed error messages from public responses
+        // Impact: Attackers learn service topology, versions, dependencies
+        // Effort: 4 hours | Priority: MEDIUM
         fastify.get('/health', async () => {
             return {
                 status: 'healthy',
@@ -106,7 +118,9 @@ class AuthService {
                 if (existingUser) {
                     return reply.status(409).send({ error: 'User already exists' });
                 }
-                // Hash password
+                // LOW: Bcrypt cost factor is good (12 rounds)
+                // Note: This provides adequate security for MVP
+                // TODO (post-MVP): Consider Argon2id for even better resistance to GPU attacks
                 const hashedPassword = await bcrypt_1.default.hash(body.password, 12);
                 // Create user and tenant in transaction
                 const result = await this.createUserAndTenant({
@@ -175,6 +189,15 @@ class AuthService {
                 });
             }
             catch (error) {
+                // MEDIUM: Generic error messages - poor developer experience
+                // FIXME: No error codes, logs, or correlation IDs for debugging
+                // TODO: Implement structured error handling:
+                //   1. Add unique error codes (AUTH_001, AUTH_002, etc.)
+                //   2. Include request correlation ID in all responses
+                //   3. Log full error with context to centralized logging
+                //   4. Return different messages for dev vs production
+                // Impact: Hard to debug, poor DX, longer incident resolution
+                // Effort: 1 day | Priority: MEDIUM
                 console.error('Login error:', error);
                 if (error instanceof zod_1.z.ZodError) {
                     return reply.status(400).send({ error: 'Invalid input' });

@@ -79,7 +79,7 @@ class AIOrchestrator {
         });
         // Rate limiting
         await fastify.register(Promise.resolve().then(() => __importStar(require('@fastify/rate-limit'))), {
-            max: 100,
+            max: 1000,
             timeWindow: '1 minute'
         });
     }

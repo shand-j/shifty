@@ -1,0 +1,35 @@
+{
+  "name": "@shifty/sdk-playwright",
+  "version": "1.0.0",
+  "description": "Playwright fixtures and auto-healing hooks for Shifty AI-Powered Testing Platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shifty/sdk-core": "*"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.40.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "shifty",
+    "testing",
+    "playwright",
+    "e2e",
+    "self-healing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shifty-ai/shifty.git",
+    "directory": "packages/sdk-playwright"
+  },
+  "license": "MIT"
+}

@@ -699,6 +699,28 @@ export class TestGenerationRequestsRepository {
   }
 
   private mapRowToRecord(row: any): TestGenerationRequestRecord {
+    // Parse JSONB fields that may come as strings from some drivers
+    let selectors: string[] = [];
+    if (row.selectors) {
+      selectors = typeof row.selectors === 'string' 
+        ? JSON.parse(row.selectors) 
+        : row.selectors;
+    }
+    
+    let metadata: Record<string, any> = {};
+    if (row.metadata) {
+      metadata = typeof row.metadata === 'string'
+        ? JSON.parse(row.metadata)
+        : row.metadata;
+    }
+    
+    let validationResult: Record<string, any> | undefined;
+    if (row.validation_result) {
+      validationResult = typeof row.validation_result === 'string'
+        ? JSON.parse(row.validation_result)
+        : row.validation_result;
+    }
+
     return {
       id: row.id,
       tenantId: row.tenant_id,
@@ -707,9 +729,9 @@ export class TestGenerationRequestsRepository {
       testType: row.test_type,
       status: row.status,
       generatedCode: row.generated_code,
-      selectors: row.selectors || [],
-      metadata: row.metadata || {},
-      validationResult: row.validation_result,
+      selectors,
+      metadata,
+      validationResult,
       errorMessage: row.error_message,
       executionTime: row.execution_time ? parseInt(row.execution_time) : undefined,
       createdAt: new Date(row.created_at),

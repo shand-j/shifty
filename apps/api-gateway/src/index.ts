@@ -343,10 +343,15 @@ class APIGateway {
 
     // Rate limiting with Redis store for persistence across restarts
     // Falls back to memory store if Redis unavailable
-    const rateLimitConfig: any = {
+    interface RateLimitContext {
+      max: number;
+      ttl: number;
+    }
+    
+    const rateLimitConfig = {
       max: process.env.NODE_ENV === 'test' ? 100 : 500, // Requests per minute
       timeWindow: '1 minute',
-      errorResponseBuilder: (request: any, context: any) => {
+      errorResponseBuilder: (_request: unknown, context: RateLimitContext) => {
         return {
           error: 'Rate limit exceeded',
           message: `Too many requests, limit: ${context.max} per minute`,
@@ -360,11 +365,12 @@ class APIGateway {
         'x-ratelimit-reset': true
       },
       // Key generator for per-tenant rate limiting
-      keyGenerator: (request: any) => {
+      keyGenerator: (request: { headers: Record<string, string | string[] | undefined>; ip?: string }) => {
         const tenantId = request.headers['x-tenant-id'] || 'anonymous';
         const ip = request.ip || 'unknown';
         return `${tenantId}:${ip}`;
-      }
+      },
+      redis: undefined as unknown
     };
 
     // Try to use Redis for rate limiting if available

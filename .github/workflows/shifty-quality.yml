@@ -63,16 +63,22 @@ jobs:
           echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
           echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
 
+      - name: Validate Tenant Configuration
+        run: |
+          if [ -z "${{ secrets.SHIFTY_TENANT_ID }}" ]; then
+            echo "::warning::SHIFTY_TENANT_ID not configured. Quality insights will use default tenant."
+          fi
+
       - name: Query Shifty Quality Insights
         id: insights
         env:
           SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
-          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID || github.repository_owner }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
         run: |
           RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/ci/actions/quality-insights" \
             -H "Content-Type: application/json" \
             -H "X-API-Key: ${SHIFTY_API_KEY}" \
-            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
             -d "{
               \"repo\": \"${{ github.repository }}\",
               \"branch\": \"${{ github.head_ref || github.ref_name }}\",

@@ -4,7 +4,12 @@ import { TestGenerator } from './core/test-generator';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
-import { getJwtConfig, validateProductionConfig } from '@shifty/shared';
+import { 
+  getJwtConfig, 
+  validateProductionConfig,
+  RequestLimits,
+  GenerateTestRequestSchema
+} from '@shifty/shared';
 
 // Validate configuration on startup
 try {
@@ -19,25 +24,17 @@ try {
 // Get centralized JWT configuration
 const jwtConfig = getJwtConfig();
 
+// Configure Fastify with proper request limits
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info'
-  }
+  },
+  bodyLimit: RequestLimits.bodyLimit,
+  requestTimeout: RequestLimits.requestTimeout
 });
 
-// Request schemas
-const GenerateTestSchema = z.object({
-  url: z.string().url(),
-  requirements: z.string().min(10),
-  testType: z.enum(['e2e', 'integration', 'smoke', 'regression']).default('e2e'),
-  browserType: z.enum(['chromium', 'firefox', 'webkit']).default('chromium'),
-  options: z.object({
-    generateVisualTests: z.boolean().default(false),
-    includeAccessibility: z.boolean().default(false),
-    mobileViewport: z.boolean().default(false),
-    timeout: z.number().min(5000).max(60000).default(30000)
-  }).optional()
-});
+// Use shared validation schema for test generation requests
+const GenerateTestSchema = GenerateTestRequestSchema;
 
 const ValidateTestSchema = z.object({
   testCode: z.string(),

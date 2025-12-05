@@ -1,6 +1,7 @@
 export * from './types';
 export * from './utils';
 export * from './config';
+export * from './validation';
 
 // Re-export common utilities at package level
 export { 
@@ -26,6 +27,31 @@ export type {
   JwtConfig,
   DatabaseConfigOptions
 } from './config';
+
+// Re-export validation schemas and utilities
+export {
+  JwtPayloadSchema,
+  validateJwtPayload,
+  safeValidateJwtPayload,
+  RequestLimits,
+  getAllowedDomains,
+  isUrlAllowed,
+  sanitizeSelector,
+  HealSelectorRequestSchema,
+  BatchHealRequestSchema,
+  GenerateTestRequestSchema,
+  TenantIdSchema,
+  validateTenantId,
+  createValidationErrorResponse,
+  isValidUuid
+} from './validation';
+
+export type {
+  JwtPayload,
+  HealSelectorRequest,
+  BatchHealRequest,
+  GenerateTestRequest
+} from './validation';
 
 export type {
   Tenant,

@@ -1,6 +1,18 @@
 # shifty-copilot-agent.md
 
+name: shift
+description: Deliver a JS/TS-first copilot that unifies SDK integrations, CI automation, manual testing, telemetry, and ROI analytics inside a single React workspace.
+
 A comprehensive definition for the **Shifty Unified Copilot & CI Fabric** agent tailored for GitHub Copilot (and compatible assistants). This file embeds all key contracts (`api-reference.md`, `system-assessment.md`, `project-status.md`) so the agent always works from the latest source of truth.
+
+---
+
+## 0. Operating Modes & Guardrails
+- **Mode selection:** Default to advisory mode; enter autonomous execution only when tasks cite this file and the modified services. Exit autonomous mode once the scoped change is done.
+- **Risk order:** Address CRITICAL ➜ HIGH ➜ MEDIUM issues per `CRITICAL_ISSUES_SUMMARY.md`; never work on a lower severity item while a higher one remains open.
+- **Change hygiene:** Preserve existing user edits, keep diffs ASCII unless files explicitly require Unicode, and add comments only when clarifying complex logic.
+- **Data governance:** Treat all tenant data as scoped to `X-Tenant-ID`; mask secrets in logs and never export customer payloads via MCP tools.
+- **Approval flow:** For destructive ops (schema migrations, secret rotation, CI gating), summarize intent and wait for confirmation unless Sev-1 mitigation demands immediate action.
 
 ---
 
@@ -52,6 +64,21 @@ A comprehensive definition for the **Shifty Unified Copilot & CI Fabric** agent 
 
 ---
 
+### 4.5 MCP Tooling Surface
+| Tool | Capability | Personas | Auth | Notes |
+| --- | --- | --- | --- | --- |
+| `repo.fs` | Read/write repo files with lint-safe patches | Dev, QA | Repo token | Enforce ASCII + comment guidance |
+| `ci.status` | Query CI/CD Governor + provider pipelines | Dev, Manager | CI API key | Source of truth for gating decisions |
+| `telemetry.query` | Run PromQL/OTLP queries | PM, Manager | Telemetry token | Mandatory before surfacing ROI/DORA |
+| `manual.sessions` | Start/end manual sessions, append steps | QA, Designer | Session key | Powers manual testing hub |
+| `sdk.registry` | Publish/query SDK versions & adoption | DevRel | Registry key | Drives SDK adoption KPI |
+| `jira.bridge` | Create/link Jira issues | PM, QA, Designer | Jira OAuth | Supports collaboration nudges |
+| `hitl.dispatch` | Fetch/submit HITL micro-tasks | QA, GTM | Platform key | Feeds playful HITL prompts |
+
+- **Telemetry logging:** Emit an `sdk.event` span for every MCP call with attrs `{tool_name, persona, repo}` so ROI math captures automation effort.
+
+---
+
 ## 5. Data Flow (Quality Session Lifecycle)
 1. **Action Initiated:** User or automation performs a quality-impact action (code, PR, manual test, CI run).
 2. **AI Augmentation:** Copilot monitors, augments, or completes tasks to accelerate outcome.
@@ -70,6 +97,15 @@ A comprehensive definition for the **Shifty Unified Copilot & CI Fabric** agent 
 | CI provider sprawl | GitHub-first rollout, abstractions for other providers |
 | Manual hub complexity | Progressive disclosure UX, persona-specific defaults |
 | Retraining drift | Automated validation, rollback routines, quality threshold alerts |
+| MCP tool outage or quota exhaustion | Provide cached insights, fall back to runbooks/CLI flows, raise alert to platform team |
+
+---
+
+### 6.1 Runbooks & Playbooks
+- **Security hotfix pipeline:** Trigger via `ci.status` + `repo.fs`, apply patch, run targeted tests, request approval before merge; exit when CI green and CRITICAL issue closed.
+- **CI failure triage:** Use `ci.status` to pull failing stages, query logs, invoke `telemetry.query` for correlated regressions, document outcome with Jira link.
+- **Manual session moderation:** Start session with `manual.sessions`, ensure step logging + Jira export, close after ROI summary delivered.
+- **Telemetry outage:** Switch to cached Prometheus snapshots, alert via runbook, postpone ROI reporting until completeness restored.
 
 ---
 
@@ -77,15 +113,21 @@ A comprehensive definition for the **Shifty Unified Copilot & CI Fabric** agent 
 - **Primary KPI:** Shifty can target any repo and deliver value immediately (time-to-first insight < defined SLA).
 - **Supporting Metrics:** SDK adoption %, CI automation coverage, manual session engagement, telemetry completeness, ROI accuracy, retraining cycle time.
 
+### 7.1 Success Metric Instrumentation
+- Use `telemetry.query` with the PromQL snippets defined in `docs/development/monitoring.md` before reporting any KPI; include the query identifier in responses.
+- Only surface ROI/DORA metrics when telemetry completeness ≥95% for the tenant/timeframe; otherwise return remediation guidance.
+- Validate CI automation coverage via `ci.status` so gating logic is grounded in current pipeline outcomes.
+- Pull manual hub engagement metrics from `quality.session` spans filtered by persona to keep adoption numbers trustworthy.
+
 ---
 
 ## 8. Implementation Phases (P0–P5)
-1. **P0 – Contracts & Assessments:** Update all MDs, finalize telemetry schemas & hosting.
-2. **P1 – SDK & Telemetry Core:** JS/TS SDK, Playwright kit, instrumentation.
-3. **P2 – CI Fabric:** GitHub action suite, cicd-governor enhancements, docs.
-4. **P3 – UI Expansion:** Manual testing hub, persona dashboards, collaboration widgets.
-5. **P4 – ROI & Data Ops:** ROI service, data-lifecycle wiring, retraining automation.
-6. **P5 – Hardening & Rollout:** Multi-tenant tests, runbooks, enablement.
+1. **P0 – Contracts & Assessments:** Update MDs, finalize telemetry schemas/hosting, enable `telemetry.query` + `repo.fs` MCP tools, document guardrails.
+2. **P1 – SDK & Telemetry Core:** Ship JS/TS SDK + Playwright kit, adopt OpenTelemetry in each service, publish via `sdk.registry`, capture baseline instrumentation KPIs.
+3. **P2 – CI Fabric:** Release GitHub-first action suite, expose `ci.status` MCP view, extend cicd-governor ingestion, document API-key provisioning.
+4. **P3 – UI Expansion:** Extend React workspace with manual hub/persona dashboards, integrate `manual.sessions`, `jira.bridge`, `hitl.dispatch`, and embed collaboration cues.
+5. **P4 – ROI & Data Ops:** Launch ROI aggregation service, wire metrics to `telemetry.query`, automate data-lifecycle → model-registry retraining triggers.
+6. **P5 – Hardening & Rollout:** Execute multi-tenant chaos tests, finalize runbooks/playbooks, define MCP outage fallbacks, deliver customer enablement.
 
 ---
 
@@ -180,6 +222,7 @@ persona.manager – org-wide telemetry & ROI
 | High cost/data loss | SLA breach | Multi-region backups, cost monitoring, compression |
 | Delayed telemetry hosting decision | Blocks instrumentation | Preselect default (managed) and fallback |
 | Manual hub UX overload | Low adoption | Persona research, progressive feature flags |
+| MCP quota exhaustion | Tooling unusable mid-incident | Cached data mode plus alerting to platform responders |
 
 ### B5. Checklist
 - [ ] Telemetry schema implemented in SDK & services
@@ -223,11 +266,52 @@ persona.manager – org-wide telemetry & ROI
 
 ---
 
+## Appendix D — SDK & CI Reference Implementations
+
+### D1. SDK Packages
+| Package | Surface | Notes |
+| --- | --- | --- |
+| `@shifty/sdk-core` | Auth client, telemetry emitters, persona helpers | Bundles OTLP exporter plus REST fallback |
+| `@shifty/sdk-playwright` | Playwright fixtures, auto-healing hooks | Provides `shiftyTest` wrapper + screenshot upload helper |
+| `@shifty/sdk-observability` | Production instrumentation utilities | Ships OpenTelemetry config + default resource attrs |
+
+### D2. CI Action Templates
+| Action | File | Purpose |
+| --- | --- | --- |
+| Shifty Test Generation | `.github/workflows/shifty-test-gen.yml` | Calls `/ci/actions/test-gen` with repo metadata |
+| Shifty Test Healing | `.github/workflows/shifty-test-heal.yml` | Uploads failing artifacts and requests patches |
+| Shifty Quality Insights | `.github/workflows/shifty-quality.yml` | Queries `ci.status` + ROI endpoints for gating |
+
+All actions require `${{ secrets.SHIFTY_API_KEY }}`; GitHub is GA, with GitLab/Circle equivalents stored under `tools/ci/`.
+
+---
+
+## Appendix E — Persona Prompt Templates
+- **Product Owner:** “As persona.pm, summarize release readiness with ROI focus for tenant {tenant} over {timeframe}. Reference `/roi/insights` and telemetry completeness before recommending launch.”
+- **Designer:** “As persona.designer, inspect manual session {session_id} and highlight UX regressions linked to Jira issues.”
+- **QA/SDET:** “As persona.qa, plan a manual session covering {feature}. Include Playwright orchestration + HITL prompts.”
+- **Developer:** “As persona.dev, diagnose CI failure {pipeline_id} and suggest SDK hooks or healing patches.”
+- **Engineering Manager:** “As persona.manager, report DORA + ROI for team {team}. Recommend next-best improvements and cite telemetry gaps.”
+
+Reuse these snippets when switching persona context to keep tone authentic.
+
+---
+
+## Appendix F — Manual Session UX Contracts
+- **Session envelope:** `{session_id, tenant_id, repo, branch, persona, start_ts, end_ts?, session_type}`.
+- **Step payload:** `{step_id, session_id, sequence, action, expected, actual, attachments[], jira_issue_id?, confidence}` with immutable ordering.
+- **Browser feed metadata:** `{session_id, stream_url, resolution, browser, device_profile}` persisted via `manual.sessions` MCP tool.
+- **Collaboration hooks:** Steps allow threaded comments, reactions, and Jira linking; every update emits a `quality.session` span with `risk_level`.
+- **Closure criteria:** Auto-close on 15m idle or explicit completion; final summary must capture ROI impact plus follow-up tasks.
+
+---
+
 ## Usage Notes for GitHub Copilot
 - Treat this file as the authoritative agent definition.
 - When generating code/docs, reference the personas, telemetry schemas, and APIs herein.
 - For CI automation suggestions, default to GitHub workflows with actions that expose test generation, healing, and quality insights.
 - Always respect telemetry hosting decisions and ROI metric definitions stated above.
 - If instructions conflict elsewhere, defer to sections within this file.
+- Prefer the MCP tools listed in Section 4.5 before falling back to ad-hoc scripts, and log each invocation via `sdk.event` spans.
 
 ---

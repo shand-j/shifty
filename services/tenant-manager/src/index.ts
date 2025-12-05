@@ -8,6 +8,17 @@ import { tenantRoutes } from './routes/tenant.routes';
 import { DatabaseManager } from '@shifty/database';
 import { errorHandler } from './middleware/error-handler';
 import { requestLogger } from './middleware/request-logger';
+import { RequestLimits, validateProductionConfig } from '@shifty/shared';
+
+// Validate configuration on startup
+try {
+  validateProductionConfig();
+} catch (error) {
+  console.error('Configuration validation failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
 
 class TenantManagerApp {
   private app: express.Application;
@@ -57,9 +68,9 @@ class TenantManagerApp {
     });
     this.app.use(limiter);
 
-    // Body parsing
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true }));
+    // Body parsing with centralized request limits
+    this.app.use(express.json({ limit: RequestLimits.bodyLimit }));
+    this.app.use(express.urlencoded({ extended: true, limit: RequestLimits.bodyLimit }));
 
     // Request logging
     this.app.use(requestLogger);

@@ -506,9 +506,61 @@ export class ManualSessionHubService {
     const summary = issueDetails?.summary || `Bug found in ${session.component || 'application'}`;
     const description = issueDetails?.description || this.generateJiraDescription(session, stepId);
 
-    // This would call the actual Jira API via integrations service
-    // For now, return a mock response
-    const jiraKey = `TEST-${Math.floor(Math.random() * 10000)}`;
+    let jiraKey: string;
+    let jiraUrl: string;
+
+    // Check if Jira integration is enabled
+    const jiraEnabled = process.env.JIRA_ENABLED === 'true';
+    const jiraApiToken = process.env.JIRA_API_TOKEN;
+    const jiraProjectKey = process.env.JIRA_PROJECT_KEY || 'QE';
+
+    if (jiraEnabled && jiraApiToken && this.jiraBaseUrl) {
+      try {
+        // Create issue via Jira REST API
+        const response = await axios.post(
+          `${this.jiraBaseUrl}/rest/api/3/issue`,
+          {
+            fields: {
+              project: { key: jiraProjectKey },
+              summary,
+              description: {
+                type: 'doc',
+                version: 1,
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: description }],
+                  },
+                ],
+              },
+              issuetype: { name: issueDetails?.issueType || 'Bug' },
+              priority: { name: issueDetails?.priority || 'Medium' },
+              labels: issueDetails?.labels || ['shifty-qa'],
+            },
+          },
+          {
+            headers: {
+              'Authorization': `Basic ${jiraApiToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        jiraKey = response.data.key;
+        jiraUrl = `${this.jiraBaseUrl}/browse/${jiraKey}`;
+        console.log(`🎫 Created Jira issue: ${jiraKey}`);
+      } catch (error: any) {
+        console.error('Failed to create Jira issue:', error.message);
+        // Fall back to local tracking
+        jiraKey = `LOCAL-${Date.now()}`;
+        jiraUrl = `local://${jiraKey}`;
+      }
+    } else {
+      // Local tracking mode when Jira is not configured
+      jiraKey = `LOCAL-${Date.now()}`;
+      jiraUrl = `local://${jiraKey}`;
+      console.warn('Jira integration not configured. Using local issue tracking. Set JIRA_ENABLED=true, JIRA_BASE_URL, and JIRA_API_TOKEN to enable.');
+    }
 
     // Update session with issue
     const issuesLogged = [...session.issuesLogged, jiraKey];
@@ -529,7 +581,7 @@ export class ManualSessionHubService {
 
     return {
       jiraKey,
-      url: `${this.jiraBaseUrl}/browse/${jiraKey}`,
+      url: jiraUrl,
     };
   }
 

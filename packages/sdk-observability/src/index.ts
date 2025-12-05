@@ -79,14 +79,23 @@ let meterProvider: MeterProvider | null = null;
 export function initializeObservability(config: ShiftyObservabilityConfig): void {
   const resource = createResource(config);
 
+  // Determine environment-appropriate defaults
+  const isProduction = process.env.NODE_ENV === 'production';
+  const defaultTraceEndpoint = isProduction 
+    ? 'https://otel-collector.shifty.ai/v1/traces'
+    : 'http://localhost:4318/v1/traces';
+  const defaultMetricEndpoint = isProduction
+    ? 'https://otel-collector.shifty.ai/v1/metrics'
+    : 'http://localhost:4318/v1/metrics';
+
   // Set up trace exporter
   const traceExporter = new OTLPTraceExporter({
-    url: config.otlpTraceEndpoint || process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || 'http://localhost:4318/v1/traces',
+    url: config.otlpTraceEndpoint || process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || defaultTraceEndpoint,
   });
 
   // Set up metric exporter
   const metricExporter = new OTLPMetricExporter({
-    url: config.otlpMetricEndpoint || process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT || 'http://localhost:4318/v1/metrics',
+    url: config.otlpMetricEndpoint || process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT || defaultMetricEndpoint,
   });
 
   // Set up metric reader

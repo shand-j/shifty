@@ -522,8 +522,7 @@ export class ROIService {
       'session_id', 'tenant_id', 'persona', 'repo', 'branch', 'component'
     ];
 
-    // This would query the actual telemetry store (OTLP collector / Prometheus)
-    // For now, we'll simulate based on available data
+    // Query telemetry samples from the database
     const samplesQuery = `
       SELECT COUNT(*) as total FROM policy_evaluations
       WHERE tenant_id = $1 AND created_at BETWEEN $2 AND $3
@@ -531,8 +530,24 @@ export class ROIService {
     const samplesResult = await this.dbManager.query(samplesQuery, [tenantId, periodStart, periodEnd]);
     const samplesAnalyzed = parseInt(samplesResult.rows[0]?.total) || 0;
 
-    // Simulate completeness ratio (would be calculated from actual telemetry)
-    const completenessRatio = Math.min(1, 0.85 + (Math.random() * 0.15));
+    // Calculate actual completeness from telemetry_completeness_samples table
+    // or fall back to configured default for testing
+    let completenessRatio: number;
+    const completenessSampleQuery = `
+      SELECT AVG(completeness_ratio) as avg_ratio FROM telemetry_completeness
+      WHERE tenant_id = $1 AND signal = $2 AND calculated_at > NOW() - INTERVAL '1 hour'
+    `;
+    const completenessSample = await this.dbManager.query(completenessSampleQuery, [tenantId, signal]);
+    
+    if (completenessSample.rows[0]?.avg_ratio) {
+      completenessRatio = parseFloat(completenessSample.rows[0].avg_ratio);
+    } else {
+      // Use configurable default for initial setup or testing environments
+      const configuredDefault = parseFloat(process.env.TELEMETRY_DEFAULT_COMPLETENESS || '0.85');
+      completenessRatio = Math.min(1, configuredDefault);
+      console.warn(`Using default completeness ratio (${completenessRatio}) - configure TELEMETRY_DEFAULT_COMPLETENESS or ensure telemetry data is flowing`);
+    }
+
     const missingAttributes = completenessRatio < threshold 
       ? requiredAttrs.slice(0, Math.ceil((1 - completenessRatio) * requiredAttrs.length))
       : [];

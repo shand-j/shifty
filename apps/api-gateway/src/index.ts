@@ -38,10 +38,208 @@ interface ServiceRoute {
   requiresAuth?: boolean;
 }
 
+// ============================================================
+// CIRCUIT BREAKER IMPLEMENTATION
+// ============================================================
+
+interface CircuitBreakerState {
+  state: 'closed' | 'open' | 'half-open';
+  failureCount: number;
+  successCount: number;
+  lastFailureTime: number;
+  nextAttemptTime: number;
+}
+
+class CircuitBreaker {
+  private circuits: Map<string, CircuitBreakerState> = new Map();
+  private readonly failureThreshold: number;
+  private readonly resetTimeout: number;
+  private readonly halfOpenSuccessThreshold: number;
+
+  constructor(options: {
+    failureThreshold?: number;
+    resetTimeout?: number;
+    halfOpenSuccessThreshold?: number;
+  } = {}) {
+    this.failureThreshold = options.failureThreshold || 5;
+    this.resetTimeout = options.resetTimeout || 30000; // 30 seconds
+    this.halfOpenSuccessThreshold = options.halfOpenSuccessThreshold || 2;
+  }
+
+  getState(serviceName: string): CircuitBreakerState {
+    if (!this.circuits.has(serviceName)) {
+      this.circuits.set(serviceName, {
+        state: 'closed',
+        failureCount: 0,
+        successCount: 0,
+        lastFailureTime: 0,
+        nextAttemptTime: 0
+      });
+    }
+    return this.circuits.get(serviceName)!;
+  }
+
+  canAttempt(serviceName: string): boolean {
+    const circuit = this.getState(serviceName);
+    
+    if (circuit.state === 'closed') {
+      return true;
+    }
+    
+    if (circuit.state === 'open') {
+      // Check if we should transition to half-open
+      if (Date.now() >= circuit.nextAttemptTime) {
+        circuit.state = 'half-open';
+        circuit.successCount = 0;
+        console.log(`🔄 Circuit for ${serviceName} transitioning to half-open`);
+        return true;
+      }
+      return false;
+    }
+    
+    // half-open state - allow the request
+    return true;
+  }
+
+  recordSuccess(serviceName: string): void {
+    const circuit = this.getState(serviceName);
+    
+    if (circuit.state === 'half-open') {
+      circuit.successCount++;
+      if (circuit.successCount >= this.halfOpenSuccessThreshold) {
+        circuit.state = 'closed';
+        circuit.failureCount = 0;
+        console.log(`✅ Circuit for ${serviceName} closed - service recovered`);
+      }
+    } else if (circuit.state === 'closed') {
+      // Reset failure count on success
+      circuit.failureCount = Math.max(0, circuit.failureCount - 1);
+    }
+  }
+
+  recordFailure(serviceName: string): void {
+    const circuit = this.getState(serviceName);
+    circuit.failureCount++;
+    circuit.lastFailureTime = Date.now();
+    
+    if (circuit.state === 'half-open') {
+      // Immediately open circuit on failure during half-open
+      circuit.state = 'open';
+      circuit.nextAttemptTime = Date.now() + this.resetTimeout;
+      console.log(`🔴 Circuit for ${serviceName} opened - half-open test failed`);
+    } else if (circuit.state === 'closed' && circuit.failureCount >= this.failureThreshold) {
+      circuit.state = 'open';
+      circuit.nextAttemptTime = Date.now() + this.resetTimeout;
+      console.log(`🔴 Circuit for ${serviceName} opened - failure threshold reached`);
+    }
+  }
+
+  getStatus(): Record<string, { state: string; failures: number }> {
+    const status: Record<string, { state: string; failures: number }> = {};
+    for (const [name, circuit] of this.circuits) {
+      status[name] = { state: circuit.state, failures: circuit.failureCount };
+    }
+    return status;
+  }
+}
+
+// ============================================================
+// REAL METRICS COLLECTION
+// ============================================================
+
+interface MetricsData {
+  requests: {
+    total: number;
+    byStatus: Record<string, number>;
+    byService: Record<string, number>;
+  };
+  latency: {
+    samples: number[];
+    sum: number;
+  };
+  startTime: number;
+}
+
+class MetricsCollector {
+  private metrics: MetricsData = {
+    requests: {
+      total: 0,
+      byStatus: {},
+      byService: {}
+    },
+    latency: {
+      samples: [],
+      sum: 0
+    },
+    startTime: Date.now()
+  };
+
+  private readonly maxSamples = 1000;
+
+  recordRequest(service: string, statusCode: number, latencyMs: number): void {
+    this.metrics.requests.total++;
+    
+    // Track by status code
+    const statusKey = String(statusCode);
+    this.metrics.requests.byStatus[statusKey] = (this.metrics.requests.byStatus[statusKey] || 0) + 1;
+    
+    // Track by service
+    this.metrics.requests.byService[service] = (this.metrics.requests.byService[service] || 0) + 1;
+    
+    // Track latency (keep rolling window)
+    this.metrics.latency.samples.push(latencyMs);
+    this.metrics.latency.sum += latencyMs;
+    
+    if (this.metrics.latency.samples.length > this.maxSamples) {
+      const removed = this.metrics.latency.samples.shift()!;
+      this.metrics.latency.sum -= removed;
+    }
+  }
+
+  getMetrics(): {
+    requests: { total: number; rate: string };
+    responses: { by_status: Record<string, number>; average_time: string };
+    services: Record<string, number>;
+    uptime: number;
+    timestamp: string;
+  } {
+    const uptimeSeconds = Math.floor((Date.now() - this.metrics.startTime) / 1000);
+    const avgLatency = this.metrics.latency.samples.length > 0
+      ? Math.round(this.metrics.latency.sum / this.metrics.latency.samples.length)
+      : 0;
+    
+    // Calculate requests per minute
+    const minutesUp = Math.max(1, uptimeSeconds / 60);
+    const requestsPerMin = Math.round(this.metrics.requests.total / minutesUp);
+
+    return {
+      requests: {
+        total: this.metrics.requests.total,
+        rate: `${requestsPerMin} req/min`
+      },
+      responses: {
+        by_status: { ...this.metrics.requests.byStatus },
+        average_time: `${avgLatency}ms`
+      },
+      services: { ...this.metrics.requests.byService },
+      uptime: uptimeSeconds,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
 class APIGateway {
   private redis = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379'
   });
+
+  private circuitBreaker = new CircuitBreaker({
+    failureThreshold: 5,
+    resetTimeout: 30000,
+    halfOpenSuccessThreshold: 2
+  });
+
+  private metricsCollector = new MetricsCollector();
 
   // MEDIUM: Hardcoded service URLs - manual configuration required
   // FIXME: Service discovery hardcoded, not K8s-friendly
@@ -100,62 +298,86 @@ class APIGateway {
   }
 
   private async registerMiddleware() {
-    // MEDIUM: CSP disabled - XSS vulnerability
-    // FIXME: contentSecurityPolicy: false removes important protection
-    // TODO: Configure proper CSP headers:
-    //   1. Set directives: default-src 'self', script-src 'self', etc.
-    //   2. Add nonce-based inline script allowance if needed
-    //   3. Report violations to security monitoring
-    //   4. Start with report-only mode, then enforce
-    // Impact: Cross-site scripting attacks possible
-    // Effort: 4 hours | Priority: MEDIUM
+    // Enable CSP with secure defaults for API gateway
+    // Note: For API-only gateway, CSP is less critical but still useful
     await fastify.register(helmet, {
-      contentSecurityPolicy: false
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for error pages
+          imgSrc: ["'self'", "data:"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+          blockAllMixedContent: process.env.NODE_ENV === 'production' ? [] : null
+        },
+        // Start with report-only in non-production for monitoring
+        reportOnly: process.env.NODE_ENV !== 'production'
+      },
+      // Additional security headers
+      xssFilter: true,
+      noSniff: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      hsts: process.env.NODE_ENV === 'production' ? {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+      } : false
     });
 
-    // CORS
-    // MEDIUM: CORS misconfiguration risk
-    // FIXME: Falls back to single origin, missing wildcard protection
-    // TODO: Improve CORS security:
-    //   1. Validate ALLOWED_ORIGINS is set in production
-    //   2. Never use '*' for credentials: true
-    //   3. Log CORS violations for monitoring
-    //   4. Restrict methods: methods: ['GET', 'POST', 'PUT', 'DELETE']
-    // Impact: CSRF vulnerability if misconfigured
-    // Effort: 2 hours | Priority: MEDIUM
+    // CORS - improved configuration with production validation
+    const corsOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
+    if (process.env.NODE_ENV === 'production' && corsOrigins.length === 0) {
+      console.warn('⚠️ WARNING: ALLOWED_ORIGINS not configured in production');
+    }
+
     await fastify.register(cors, {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3010'],
-      credentials: true
+      origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:3010'],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID'],
+      exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+      maxAge: 86400 // 24 hours
     });
 
-    // Rate limiting - use memory store with reasonable limits
-    // HIGH: In-memory rate limiting doesn't persist - DDoS vulnerability
-    // FIXME: Redis integration commented out, limits reset on restart
-    // TODO: Fix Redis integration:
-    //   1. Upgrade @fastify/rate-limit to compatible version
-    //   2. Enable redis: this.redis in config
-    //   3. Test rate limits persist across pod restarts
-    //   4. Add per-tenant rate limiting (use tenantId as key)
-    // Impact: No DDoS protection, per-tenant limits don't work
-    // Effort: 1 day | Priority: HIGH
-    await fastify.register(rateLimit, {
-      max: process.env.NODE_ENV === 'test' ? 10 : 1000, // Lower limit for testing
+    // Rate limiting with Redis store for persistence across restarts
+    // Falls back to memory store if Redis unavailable
+    const rateLimitConfig: any = {
+      max: process.env.NODE_ENV === 'test' ? 100 : 500, // Requests per minute
       timeWindow: '1 minute',
-      errorResponseBuilder: (request, context) => {
+      errorResponseBuilder: (request: any, context: any) => {
         return {
           error: 'Rate limit exceeded',
           message: `Too many requests, limit: ${context.max} per minute`,
-          retryAfter: context.ttl
+          retryAfter: context.ttl,
+          code: 'RATE_LIMIT_EXCEEDED'
         };
       },
       addHeaders: {
         'x-ratelimit-limit': true,
         'x-ratelimit-remaining': true,
         'x-ratelimit-reset': true
+      },
+      // Key generator for per-tenant rate limiting
+      keyGenerator: (request: any) => {
+        const tenantId = request.headers['x-tenant-id'] || 'anonymous';
+        const ip = request.ip || 'unknown';
+        return `${tenantId}:${ip}`;
       }
-      // Use built-in memory store instead of Redis for now
-      // redis: this.redis  // Commented out due to compatibility issues
-    });
+    };
+
+    // Try to use Redis for rate limiting if available
+    try {
+      if (this.redis.isReady) {
+        rateLimitConfig.redis = this.redis;
+        console.log('✅ Rate limiting using Redis store');
+      }
+    } catch (error) {
+      console.warn('⚠️ Redis not available for rate limiting, using memory store');
+    }
+
+    await fastify.register(rateLimit, rateLimitConfig);
 
     // JWT configuration using centralized config module
     // Production validation is handled at startup via validateProductionConfig()
@@ -166,49 +388,85 @@ class APIGateway {
   }
 
   private async registerRoutes() {
-    // Health check with service discovery
+    // Health check with circuit breaker protection
     fastify.get('/health', async () => {
-      // HIGH: No circuit breaker - cascading failures
-      // FIXME: When one service is down, health checks keep hammering it
-      // TODO: Implement circuit breaker pattern:
-      //   1. Track failure rate per service (open circuit after 50% failures)
-      //   2. Add half-open state (test recovery after timeout)
-      //   3. Return cached status when circuit is open
-      //   4. Use library like opossum or implement custom
-      // Impact: One service down can take entire platform offline
-      // Effort: 2 days | Priority: HIGH
       const serviceHealth = await Promise.allSettled(
         this.services.map(async (service) => {
+          const serviceName = service.prefix.replace('/api/v1/', '');
+          const startTime = Date.now();
+          
+          // Check circuit breaker before attempting
+          if (!this.circuitBreaker.canAttempt(serviceName)) {
+            return {
+              service: service.prefix,
+              status: 'circuit-open',
+              target: service.target,
+              circuitState: this.circuitBreaker.getState(serviceName).state
+            };
+          }
+
           try {
             const response = await fetch(`${service.target}/health`, {
               method: 'GET',
               signal: AbortSignal.timeout(5000)
             });
-            return {
-              service: service.prefix,
-              status: response.ok ? 'healthy' : 'unhealthy',
-              target: service.target
-            };
-          } catch {
+            
+            const latency = Date.now() - startTime;
+            
+            if (response.ok) {
+              this.circuitBreaker.recordSuccess(serviceName);
+              this.metricsCollector.recordRequest(serviceName, 200, latency);
+              return {
+                service: service.prefix,
+                status: 'healthy',
+                target: service.target,
+                responseTime: `${latency}ms`
+              };
+            } else {
+              this.circuitBreaker.recordFailure(serviceName);
+              this.metricsCollector.recordRequest(serviceName, response.status, latency);
+              return {
+                service: service.prefix,
+                status: 'unhealthy',
+                target: service.target,
+                responseTime: `${latency}ms`
+              };
+            }
+          } catch (error) {
+            const latency = Date.now() - startTime;
+            this.circuitBreaker.recordFailure(serviceName);
+            this.metricsCollector.recordRequest(serviceName, 503, latency);
             return {
               service: service.prefix,
               status: 'unreachable',
-              target: service.target
+              target: service.target,
+              responseTime: `${latency}ms`
             };
           }
         })
       );
 
+      const results = serviceHealth.map(result =>
+        result.status === 'fulfilled' ? result.value : {
+          service: 'unknown',
+          status: 'error'
+        }
+      );
+
+      // Determine overall status
+      const healthyCount = results.filter(s => s.status === 'healthy').length;
+      const overallStatus = healthyCount === results.length 
+        ? 'healthy' 
+        : healthyCount > 0 
+          ? 'degraded' 
+          : 'unhealthy';
+
       return {
-        status: 'healthy',
+        status: overallStatus,
         service: 'api-gateway',
         timestamp: new Date().toISOString(),
-        services: serviceHealth.map(result =>
-          result.status === 'fulfilled' ? result.value : {
-            service: 'unknown',
-            status: 'error'
-          }
-        )
+        services: results,
+        circuitBreakers: this.circuitBreaker.getStatus()
       };
     });
 
@@ -216,21 +474,45 @@ class APIGateway {
     fastify.get('/api/v1/services/health', async () => {
       const serviceHealth = await Promise.allSettled(
         this.services.map(async (service) => {
+          const serviceName = service.prefix.replace('/api/v1/', '');
+          const startTime = Date.now();
+          
+          // Check circuit breaker
+          if (!this.circuitBreaker.canAttempt(serviceName)) {
+            return {
+              service: serviceName,
+              status: 'circuit-open',
+              last_check: new Date().toISOString(),
+              response_time: 'N/A',
+              target: service.target,
+              circuit_state: this.circuitBreaker.getState(serviceName).state
+            };
+          }
+
           try {
             const response = await fetch(`${service.target}/health`, {
               method: 'GET',
               signal: AbortSignal.timeout(3000)
             });
+            const responseTime = Date.now() - startTime;
+            
+            if (response.ok) {
+              this.circuitBreaker.recordSuccess(serviceName);
+            } else {
+              this.circuitBreaker.recordFailure(serviceName);
+            }
+
             return {
-              service: service.prefix.replace('/api/v1/', ''),
+              service: serviceName,
               status: response.ok ? 'healthy' : 'unhealthy',
               last_check: new Date().toISOString(),
-              response_time: '< 100ms', // Simplified for MVP
+              response_time: `${responseTime}ms`,
               target: service.target
             };
           } catch {
+            this.circuitBreaker.recordFailure(serviceName);
             return {
-              service: service.prefix.replace('/api/v1/', ''),
+              service: serviceName,
               status: 'unhealthy',
               last_check: new Date().toISOString(),
               response_time: 'timeout',
@@ -266,37 +548,25 @@ class APIGateway {
       return {
         overall_status,
         services,
+        circuitBreakers: this.circuitBreaker.getStatus(),
         timestamp: new Date().toISOString()
       };
     });
 
-    // Gateway metrics endpoint
+    // Gateway metrics endpoint - now with real metrics
     fastify.get('/api/v1/metrics', async () => {
-      // HIGH: Mock metrics - monitoring is fake
-      // FIXME: Random data doesn't reflect actual system state
-      // TODO: Implement real metrics collection:
-      //   1. Install Prometheus client or CloudWatch SDK
-      //   2. Track actual request counters, latencies, status codes
-      //   3. Aggregate from all services via service mesh
-      //   4. Add Redis for metrics storage/aggregation
-      // Impact: Cannot diagnose production issues, false sense of health
-      // Effort: 3-5 days | Priority: HIGH
+      const metrics = this.metricsCollector.getMetrics();
+      
       return {
-        requests: {
-          total: Math.floor(Math.random() * 1000) + 100, // MOCK: data for MVP
-          rate: Math.floor(Math.random() * 50) + 10 + ' req/min'
+        requests: metrics.requests,
+        responses: metrics.responses,
+        services: {
+          count: this.services.length,
+          breakdown: metrics.services
         },
-        responses: {
-          by_status: {
-            '200': Math.floor(Math.random() * 800) + 100,
-            '404': Math.floor(Math.random() * 50) + 5,
-            '500': Math.floor(Math.random() * 20) + 1
-          },
-          average_time: Math.floor(Math.random() * 200) + 50 + 'ms'
-        },
-        services: this.services.length,
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        circuitBreakers: this.circuitBreaker.getStatus(),
+        uptime: metrics.uptime,
+        timestamp: metrics.timestamp
       };
     });
 
@@ -311,6 +581,14 @@ class APIGateway {
           documentation: `${service.target}/docs`
         }))
       };
+    });
+
+    // Track metrics for all requests via hook
+    fastify.addHook('onResponse', async (request, reply) => {
+      const service = this.services.find(s => request.url.startsWith(s.prefix));
+      const serviceName = service ? service.prefix.replace('/api/v1/', '') : 'gateway';
+      const latency = reply.getResponseTime();
+      this.metricsCollector.recordRequest(serviceName, reply.statusCode, latency);
     });
 
     // Authentication middleware

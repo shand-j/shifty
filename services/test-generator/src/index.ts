@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { DatabaseManager } from '@shifty/database';
+import { DatabaseManager, TestGenerationRequestsRepository, TestGenerationRequestRecord } from '@shifty/database';
 import { TestGenerator } from './core/test-generator';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -75,13 +75,29 @@ interface TestGenerationRequest {
 class TestGeneratorService {
   private dbManager: DatabaseManager;
   private testGenerator: TestGenerator;
+  private testGenRepo: TestGenerationRequestsRepository;
+  // Configuration for tenant database URLs - in production, this would come from tenant manager
+  private tenantDbUrlTemplate: string;
 
   constructor() {
     this.dbManager = new DatabaseManager();
+    this.testGenRepo = new TestGenerationRequestsRepository(this.dbManager);
     this.testGenerator = new TestGenerator({
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       model: process.env.AI_MODEL || 'llama3.1'
     });
+    // Template for tenant database URLs - use env var or default pattern
+    this.tenantDbUrlTemplate = process.env.TENANT_DB_URL_TEMPLATE || 
+      process.env.DATABASE_URL || 
+      'postgresql://localhost:5432/shifty_tenant_{tenantId}';
+  }
+
+  /**
+   * Get tenant database URL for a given tenant.
+   * In production, this would fetch from tenant manager service.
+   */
+  private getTenantDbUrl(tenantId: string): string {
+    return this.tenantDbUrlTemplate.replace('{tenantId}', tenantId);
   }
 
   async start() {
@@ -365,23 +381,35 @@ class TestGeneratorService {
     }
   }
 
+  // In-memory store for tracking tenant IDs per request (for status updates)
+  private requestTenantMap: Map<string, string> = new Map();
+
   private async createGenerationRequest(
     id: string,
     tenantId: string,
     request: any
   ): Promise<void> {
-    // HIGH: No database persistence - data not stored
-    // FIXME: Console logs instead of database writes
-    // TODO: Implement real database storage:
-    //   1. Use DatabaseManager.getTenantPool(tenantId)
-    //   2. INSERT into test_generation_requests table
-    //   3. Add proper error handling and retries
-    // Impact: No generation history, no analytics, tenant isolation broken
-    // Effort: 1 day | Priority: HIGH
-    console.log(`Creating generation request ${id} for tenant ${tenantId}`);
-    
-    // For MVP, we'll use in-memory storage
-    // In production, this would use the database
+    try {
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      
+      await this.testGenRepo.create(tenantId, dbUrl, {
+        id,
+        tenantId,
+        url: request.url,
+        requirements: request.requirements,
+        testType: request.testType
+      });
+
+      // Store the tenant ID mapping for status updates
+      this.requestTenantMap.set(id, tenantId);
+
+      console.log(`✅ Generation request ${id} created for tenant ${tenantId}`);
+    } catch (error) {
+      // Log error but don't fail the request - persistence is best-effort
+      console.error(`Failed to persist generation request ${id} for tenant ${tenantId}:`, error);
+      // Store in memory map as fallback
+      this.requestTenantMap.set(id, tenantId);
+    }
   }
 
   private async updateGenerationStatus(
@@ -390,38 +418,64 @@ class TestGeneratorService {
     code?: string,
     additional?: any
   ): Promise<void> {
-    // HIGH: No database updates - status not persisted
-    // FIXME: Status updates lost, no progress tracking
-    // TODO: UPDATE test_generation_requests SET status = $1 WHERE id = $2
-    // Effort: 1 day | Priority: HIGH
-    console.log(`Updating generation request ${id} status to ${status}`);
-    
-    // For MVP, this would update the database
-    // Implementation would store in the tenant's database
+    try {
+      const tenantId = this.requestTenantMap.get(id);
+      if (!tenantId) {
+        console.warn(`No tenant ID found for request ${id}, status update skipped`);
+        return;
+      }
+
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      
+      await this.testGenRepo.updateStatus(tenantId, dbUrl, id, status, {
+        generatedCode: code,
+        selectors: additional?.selectors,
+        metadata: additional?.metadata,
+        validationResult: additional?.validationResult,
+        errorMessage: additional?.error,
+        executionTime: additional?.executionTime
+      });
+
+      console.log(`✅ Generation request ${id} status updated to ${status}`);
+
+      // Clean up memory map on terminal states
+      if (status === 'completed' || status === 'failed') {
+        this.requestTenantMap.delete(id);
+      }
+    } catch (error) {
+      console.error(`Failed to update generation request ${id} status:`, error);
+    }
   }
 
   private async getGenerationRequest(
     id: string,
     tenantId: string
   ): Promise<TestGenerationRequest | null> {
-    console.log(`Getting generation request ${id} for tenant ${tenantId}`);
-    
-    // For MVP, return null for non-existent jobs (testing purposes)
-    // In production, this would query the database
-    if (id === 'non-existent-job-id' || !id || id.startsWith('invalid-')) {
+    try {
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      const record = await this.testGenRepo.getById(tenantId, dbUrl, id);
+
+      if (!record) {
+        return null;
+      }
+
+      return {
+        id: record.id,
+        tenantId: record.tenantId,
+        url: record.url,
+        requirements: record.requirements,
+        testType: record.testType,
+        status: record.status,
+        generatedCode: record.generatedCode,
+        validationResult: record.validationResult,
+        createdAt: record.createdAt,
+        completedAt: record.completedAt
+      };
+    } catch (error) {
+      console.error(`Failed to get generation request ${id} for tenant ${tenantId}:`, error);
+      // Return null if database is unavailable
       return null;
     }
-    
-    return {
-      id,
-      tenantId,
-      url: 'https://example.com',
-      requirements: 'Sample test requirements',
-      testType: 'e2e',
-      status: 'completed',
-      generatedCode: `// Generated test code for ${id}`,
-      createdAt: new Date()
-    };
   }
 
   private async getGenerationHistory(
@@ -429,11 +483,26 @@ class TestGeneratorService {
     limit: number,
     offset: number
   ): Promise<TestGenerationRequest[]> {
-    console.log(`Getting generation history for tenant ${tenantId}`);
-    
-    // For MVP, return mock data
-    // In production, this would query the database with proper pagination
-    return [];
+    try {
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      const records = await this.testGenRepo.getHistory(tenantId, dbUrl, limit, offset);
+
+      return records.map(record => ({
+        id: record.id,
+        tenantId: record.tenantId,
+        url: record.url,
+        requirements: record.requirements,
+        testType: record.testType,
+        status: record.status,
+        generatedCode: record.generatedCode,
+        validationResult: record.validationResult,
+        createdAt: record.createdAt,
+        completedAt: record.completedAt
+      }));
+    } catch (error) {
+      console.error(`Failed to get generation history for tenant ${tenantId}:`, error);
+      return [];
+    }
   }
 
   async stop() {

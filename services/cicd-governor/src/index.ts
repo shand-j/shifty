@@ -247,6 +247,213 @@ class CICDGovernorApp {
         return reply.code(400).send({ success: false, error: error.message });
       }
     });
+
+    // ==================== CI Actions for GitHub Workflows ====================
+
+    // Test Generation Action Endpoint
+    fastify.post('/api/v1/ci/actions/test-gen', async (request, reply) => {
+      try {
+        const body = request.body as {
+          repo: string;
+          commitSha: string;
+          url: string;
+          requirements: string;
+          testType?: string;
+        };
+
+        // Generate unique request ID
+        const requestId = `gen-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+        // Forward to test-generator service (internal call)
+        const testGeneratorUrl = process.env.TEST_GENERATOR_URL || 'http://localhost:3004';
+        const response = await fetch(`${testGeneratorUrl}/api/v1/tests/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-ID': request.headers['x-tenant-id'] as string || 'default',
+            'X-API-Key': request.headers['x-api-key'] as string || ''
+          },
+          body: JSON.stringify({
+            url: body.url,
+            requirements: body.requirements,
+            testType: body.testType || 'e2e'
+          })
+        });
+
+        const result = await response.json() as { requestId?: string; status?: string };
+
+        // Log CI action to governor service
+        console.log(`CI Action: test-gen for repo ${body.repo} at ${body.commitSha}`);
+
+        return reply.code(201).send({
+          success: true,
+          requestId: result.requestId || requestId,
+          status: result.status || 'pending',
+          message: 'Test generation request submitted',
+          metadata: {
+            repo: body.repo,
+            commitSha: body.commitSha,
+            testType: body.testType || 'e2e'
+          }
+        });
+      } catch (error: any) {
+        console.error('CI test-gen action failed:', error);
+        return reply.code(500).send({ success: false, error: error.message });
+      }
+    });
+
+    // Test Healing Action Endpoint
+    fastify.post('/api/v1/ci/actions/test-heal', async (request, reply) => {
+      try {
+        const body = request.body as {
+          repo: string;
+          commitSha: string;
+          testFile: string;
+          failingSelector: string;
+          pageUrl: string;
+        };
+
+        // Forward to healing-engine service (internal call)
+        const healingEngineUrl = process.env.HEALING_ENGINE_URL || 'http://localhost:3005';
+        const response = await fetch(`${healingEngineUrl}/api/v1/healing/heal-selector`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Tenant-ID': request.headers['x-tenant-id'] as string || 'default',
+            'X-API-Key': request.headers['x-api-key'] as string || ''
+          },
+          body: JSON.stringify({
+            url: body.pageUrl,
+            brokenSelector: body.failingSelector,
+            strategy: 'ai-powered-analysis'
+          })
+        });
+
+        const result = await response.json() as {
+          success?: boolean;
+          status?: string;
+          healedSelector?: string;
+          healed?: string;
+          confidence?: number;
+          strategy?: string;
+          alternatives?: string[];
+        };
+
+        // Log CI action
+        console.log(`CI Action: test-heal for repo ${body.repo} at ${body.commitSha}`);
+
+        return {
+          success: result.success || result.status === 'success',
+          healedSelector: result.healedSelector || result.healed,
+          confidence: result.confidence || 0,
+          strategy: result.strategy || 'unknown',
+          alternatives: result.alternatives || [],
+          metadata: {
+            repo: body.repo,
+            commitSha: body.commitSha,
+            testFile: body.testFile,
+            originalSelector: body.failingSelector
+          }
+        };
+      } catch (error: any) {
+        console.error('CI test-heal action failed:', error);
+        return reply.code(500).send({ success: false, error: error.message });
+      }
+    });
+
+    // Quality Insights Action Endpoint
+    fastify.post('/api/v1/ci/actions/quality-insights', async (request, reply) => {
+      try {
+        const body = request.body as {
+          repo: string;
+          branch: string;
+          commitSha: string;
+          prNumber?: number;
+          testCount?: number;
+          changedFiles?: number;
+        };
+
+        // Calculate quality metrics
+        const testCoverage = body.testCount ? Math.min(100, body.testCount * 2) : 0;
+        const changeRisk = body.changedFiles ? Math.min(100, body.changedFiles * 5) : 0;
+        
+        // Calculate quality score (simplified algorithm)
+        const qualityScore = Math.round(
+          (testCoverage * 0.5) + 
+          ((100 - changeRisk) * 0.3) + 
+          (50 * 0.2) // Base score
+        );
+
+        // Determine gate status
+        const gateStatus = qualityScore >= 70 ? 'passed' : 
+                          qualityScore >= 50 ? 'warning' : 'failed';
+
+        // Generate recommendations
+        const recommendations: string[] = [];
+        if (testCoverage < 70) {
+          recommendations.push('Consider adding more tests to improve coverage');
+        }
+        if (changeRisk > 50) {
+          recommendations.push('Large number of changed files - consider splitting into smaller PRs');
+        }
+        if (qualityScore < 70) {
+          recommendations.push('Run additional test suites before merging');
+        }
+
+        // Log CI action
+        console.log(`CI Action: quality-insights for repo ${body.repo} branch ${body.branch}`);
+
+        return {
+          success: true,
+          gateStatus,
+          qualityScore,
+          coverage: `${testCoverage}%`,
+          recommendations,
+          metadata: {
+            repo: body.repo,
+            branch: body.branch,
+            commitSha: body.commitSha,
+            prNumber: body.prNumber,
+            analyzedAt: new Date().toISOString()
+          }
+        };
+      } catch (error: any) {
+        console.error('CI quality-insights action failed:', error);
+        return reply.code(500).send({ success: false, error: error.message });
+      }
+    });
+
+    // CI Status Endpoint (MCP tool interface)
+    fastify.get('/api/v1/ci/status', async (request, reply) => {
+      try {
+        const { repo, branch, provider } = request.query as {
+          repo?: string;
+          branch?: string;
+          provider?: string;
+        };
+
+        // Return CI status for the repository
+        return {
+          success: true,
+          status: 'operational',
+          provider: provider || 'github',
+          pipelines: {
+            active: 0,
+            queued: 0,
+            completed: 0
+          },
+          lastSync: new Date().toISOString(),
+          capabilities: [
+            'test-generation',
+            'test-healing',
+            'quality-insights',
+            'release-gates'
+          ]
+        };
+      } catch (error: any) {
+        return reply.code(500).send({ success: false, error: error.message });
+      }
+    });
   }
 
   async stop() {

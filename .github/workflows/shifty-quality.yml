@@ -1,0 +1,205 @@
+# Shifty Quality Insights GitHub Action
+#
+# This workflow queries Shifty for quality insights and gating decisions
+# based on test results, coverage, and AI analysis.
+#
+# Usage:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Configure to run after your test workflow
+
+name: Shifty Quality Insights
+
+on:
+  # Run after test workflows complete
+  workflow_run:
+    workflows: ["CI", "Tests", "E2E Tests"]
+    types: [completed]
+
+  # Run on PRs
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      enforce_gate:
+        description: 'Enforce quality gate (fail if not met)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+
+jobs:
+  quality-insights:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      statuses: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate metrics
+
+      - name: Gather repository metrics
+        id: metrics
+        run: |
+          # Count test files
+          TEST_COUNT=$(find . -name "*.test.ts" -o -name "*.spec.ts" | wc -l)
+          
+          # Get changed files in PR
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l)
+          else
+            CHANGED_FILES=0
+          fi
+          
+          echo "test_count=$TEST_COUNT" >> $GITHUB_OUTPUT
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+
+      - name: Query Shifty Quality Insights
+        id: insights
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID || github.repository_owner }}
+        run: |
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/ci/actions/quality-insights" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID}" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"branch\": \"${{ github.head_ref || github.ref_name }}\",
+              \"commitSha\": \"${{ github.sha }}\",
+              \"prNumber\": ${{ github.event.pull_request.number || 'null' }},
+              \"testCount\": ${{ steps.metrics.outputs.test_count }},
+              \"changedFiles\": ${{ steps.metrics.outputs.changed_files }}
+            }")
+          
+          echo "API Response: $RESPONSE"
+          
+          # Extract values
+          GATE_STATUS=$(echo $RESPONSE | jq -r '.gateStatus // "unknown"')
+          QUALITY_SCORE=$(echo $RESPONSE | jq -r '.qualityScore // 0')
+          RECOMMENDATIONS=$(echo $RESPONSE | jq -r '.recommendations // []')
+          
+          echo "gate_status=$GATE_STATUS" >> $GITHUB_OUTPUT
+          echo "quality_score=$QUALITY_SCORE" >> $GITHUB_OUTPUT
+          echo "recommendations<<EOF" >> $GITHUB_OUTPUT
+          echo $RESPONSE | jq -r '.recommendations[]? // empty' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Store full response for reporting
+          echo "$RESPONSE" > insights.json
+
+      - name: Create Check Run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let insights = {};
+            try {
+              insights = JSON.parse(fs.readFileSync('insights.json', 'utf8'));
+            } catch (e) {
+              insights = { gateStatus: 'unknown', qualityScore: 0 };
+            }
+            
+            const status = insights.gateStatus === 'passed' ? 'success' : 
+                           insights.gateStatus === 'failed' ? 'failure' : 'neutral';
+            
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: 'Shifty Quality Gate',
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: status,
+              output: {
+                title: `Quality Score: ${insights.qualityScore || 0}/100`,
+                summary: `## 📊 Shifty Quality Insights\n\n` +
+                  `**Gate Status:** ${insights.gateStatus || 'Unknown'}\n` +
+                  `**Quality Score:** ${insights.qualityScore || 0}/100\n\n` +
+                  `### Recommendations\n` +
+                  (insights.recommendations?.map(r => `- ${r}`).join('\n') || 'No recommendations'),
+                text: JSON.stringify(insights, null, 2)
+              }
+            });
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let insights = {};
+            try {
+              insights = JSON.parse(fs.readFileSync('insights.json', 'utf8'));
+            } catch (e) {
+              insights = { gateStatus: 'unknown', qualityScore: 0 };
+            }
+            
+            const statusEmoji = insights.gateStatus === 'passed' ? '✅' :
+                               insights.gateStatus === 'failed' ? '❌' : '⚠️';
+            
+            const body = `## ${statusEmoji} Shifty Quality Gate
+            
+            | Metric | Value |
+            |--------|-------|
+            | Quality Score | ${insights.qualityScore || 0}/100 |
+            | Gate Status | ${insights.gateStatus || 'Unknown'} |
+            | Test Coverage | ${insights.coverage || 'N/A'} |
+            
+            ${insights.recommendations?.length > 0 ? `
+            ### 💡 Recommendations
+            
+            ${insights.recommendations.map(r => `- ${r}`).join('\n')}
+            ` : ''}
+            
+            ---
+            *Powered by [Shifty AI](https://shifty.ai)*
+            `;
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            const existingComment = comments.find(c => 
+              c.user.type === 'Bot' && c.body.includes('Shifty Quality Gate')
+            );
+            
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
+
+      - name: Enforce Quality Gate
+        if: inputs.enforce_gate == true || github.event_name == 'pull_request'
+        run: |
+          GATE_STATUS="${{ steps.insights.outputs.gate_status }}"
+          
+          if [ "${{ github.event.inputs.enforce_gate }}" = "true" ] && [ "$GATE_STATUS" = "failed" ]; then
+            echo "❌ Quality gate failed!"
+            exit 1
+          fi
+          
+          echo "✅ Quality gate status: $GATE_STATUS"

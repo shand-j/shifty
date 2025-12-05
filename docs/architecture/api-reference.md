@@ -492,3 +492,206 @@ Install the "REST Client" extension and use the [API test file](../testing/api-t
 **Last Updated:** 2025-01-11  
 **API Version:** 1.0  
 **Maintained by:** Shifty Development Team
+---
+
+## 📊 ROI Service API
+
+### Base Route: `/api/v1/roi`
+
+#### Get ROI Insights
+```http
+GET /api/v1/roi/insights?tenantId={uuid}&teamId={uuid}&timeframe={monthly}
+Authorization: Bearer {jwt_token}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "roi": {
+      "timeSavings": { "totalHoursSaved": 150, "totalDollarsSaved": 11250 },
+      "qualityImpact": { "incidentsPreventedCount": 5, "bugsPreventedInProduction": 12 },
+      "velocityGains": { "velocityIndex": 135 },
+      "costAnalysis": { "roiPercentage": 450, "paybackPeriodMonths": 0.5 }
+    },
+    "operationalMetrics": { "testsGenerated": 45, "healingSuccessRate": 92 }
+  }
+}
+```
+
+#### Get DORA Metrics
+```http
+GET /api/v1/roi/dora?tenantId={uuid}&timeframe={monthly}
+Authorization: Bearer {jwt_token}
+```
+
+#### Get SPACE Metrics
+```http
+GET /api/v1/roi/space?tenantId={uuid}&timeframe={monthly}
+Authorization: Bearer {jwt_token}
+```
+
+#### Check Telemetry Completeness
+```http
+GET /api/v1/roi/telemetry-completeness?tenantId={uuid}
+Authorization: Bearer {jwt_token}
+```
+
+#### Generate ROI Report
+```http
+POST /api/v1/roi/reports
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "tenantId": "uuid",
+  "reportType": "detailed",
+  "startDate": "2025-01-01",
+  "endDate": "2025-01-31"
+}
+```
+
+---
+
+## ⚡ Performance Testing API
+
+### Base Route: `/api/v1/performance`
+
+#### Create Test Configuration
+```http
+POST /api/v1/performance/configs
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "tenantId": "uuid",
+  "name": "Load Test - Login Flow",
+  "testType": "load",
+  "targetUrl": "https://app.example.com",
+  "virtualUsers": 100,
+  "rampUpSeconds": 60,
+  "durationSeconds": 300,
+  "thresholds": {
+    "maxResponseTimeMs": 3000,
+    "maxP95ResponseTimeMs": 2000,
+    "maxP99ResponseTimeMs": 2500,
+    "maxErrorRate": 1,
+    "minThroughputRps": 100
+  },
+  "scenarios": []
+}
+```
+
+#### Start Test Run
+```http
+POST /api/v1/performance/runs
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "configId": "uuid"
+}
+```
+
+---
+
+## 🔒 Security Testing API
+
+### Base Route: `/api/v1/security`
+
+#### Create Scan Configuration
+```http
+POST /api/v1/security/configs
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "tenantId": "uuid",
+  "name": "DAST Scan - Production",
+  "scanType": "dast",
+  "target": { "url": "https://app.example.com" },
+  "settings": { "maxDepth": 3 },
+  "thresholds": { "maxCritical": 0, "maxHigh": 0 }
+}
+```
+
+#### Start Security Scan
+```http
+POST /api/v1/security/scans
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "configId": "uuid"
+}
+```
+
+---
+
+## ♿ Accessibility Testing API
+
+### Base Route: `/api/v1/accessibility`
+
+#### Create Scan Configuration
+```http
+POST /api/v1/accessibility/configs
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "tenantId": "uuid",
+  "name": "WCAG 2.1 AA Scan",
+  "targetUrls": ["https://app.example.com"],
+  "standard": "WCAG21AA",
+  "settings": { "maxPages": 50 },
+  "thresholds": { "maxCritical": 0, "maxSerious": 5 }
+}
+```
+
+#### Start Accessibility Scan
+```http
+POST /api/v1/accessibility/scans
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "configId": "uuid"
+}
+```
+
+---
+
+## 📋 Manual Testing Hub API
+
+### Base Route: `/api/v1/sessions/manual`
+
+#### Create Quality Session
+```http
+POST /api/v1/sessions/manual
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "tenantId": "uuid",
+  "userId": "uuid",
+  "persona": "qa",
+  "sessionType": "exploratory",
+  "title": "Login Flow Testing",
+  "charter": "Explore authentication edge cases"
+}
+```
+
+#### Add Test Step
+```http
+POST /api/v1/sessions/manual/{sessionId}/steps
+Content-Type: application/json
+Authorization: Bearer {jwt_token}
+
+{
+  "sequence": 1,
+  "action": "Navigate to login page",
+  "expectedResult": "Login form displayed",
+  "status": "pending"
+}
+```

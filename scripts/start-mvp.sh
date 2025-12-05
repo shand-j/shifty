@@ -26,6 +26,18 @@ if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/
     exit 1
 fi
 
+WORKSPACE_IMAGE="shifty-workspace:node20-20251205"
+
+if [ -n "$FORCE_WORKSPACE_IMAGE" ]; then
+    echo -e "${YELLOW}♻️  FORCE_WORKSPACE_IMAGE is set. Rebuilding workspace image...${NC}"
+    docker build -f Dockerfile.base -t "$WORKSPACE_IMAGE" .
+elif ! docker image inspect "$WORKSPACE_IMAGE" >/dev/null 2>&1; then
+    echo -e "${YELLOW}📦 Building shared workspace image (${WORKSPACE_IMAGE})...${NC}"
+    docker build -f Dockerfile.base -t "$WORKSPACE_IMAGE" .
+else
+    echo -e "${GREEN}✅ Workspace image ${WORKSPACE_IMAGE} already present. Skipping rebuild.${NC}"
+fi
+
 echo -e "${YELLOW}📦 Building and starting services...${NC}"
 
 # Start the platform services

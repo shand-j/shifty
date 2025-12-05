@@ -312,6 +312,14 @@ Stand up OpenTelemetry collectors + Prometheus metrics, build ROI aggregation se
 | `roi` (new) | 3012 | ROI aggregation and reporting |
 | `ai-orchestrator` | 3003 | Coordination of AI operations |
 
+### ✅ **Telemetry Decisions Locked (Dec 2025)**
+
+- **Hosting:** Managed Cortex/Mimir SaaS is the default collector/metrics backend with dual OTLP gateways (US/EU). Self-managed Prometheus/Tempo stacks remain available for sovereignty mandates and reuse the same schemas/SLAs.
+- **Retention:** Traces 30d hot + 180d cold archive, metrics 90d, logs 180d. Secure delete and retention enforcement owned by `data-lifecycle`.
+- **Sampling:** `quality.session` and `manual.step` spans are 100% sampled; all other spans must maintain ≥10% sampling with adaptive bump during incidents.
+- **Resource attrs:** `service.name`, `service.version`, `deployment.environment`, `x-tenant-id` are mandatory across spans/metrics/logs. Missing attrs fail CI via lint checks.
+- **Telemetry completeness gate:** `telemetry_completeness_ratio` < 0.95 blocks ROI/DORA exports; dashboards must surface the ratio next to each KPI.
+
 ### ✅ **Data Lifecycle Endpoints** (Already Implemented)
 
 | Endpoint | Method | Description |
@@ -351,6 +359,16 @@ Stand up OpenTelemetry collectors + Prometheus metrics, build ROI aggregation se
 - `ci_pipeline_duration_seconds{provider,stage}`
 - `roi_time_saved_seconds{team}`
 - `incidents_prevented_total{team}`
+- `telemetry_completeness_ratio{tenant_id,signal}`
+
+#### ROI Query Heads (PromQL)
+- **TTFI 95th percentile** – `histogram_quantile(0.95, sum(rate(ci_pipeline_duration_seconds_bucket{stage="insight"}[5m])) by (le))`
+- **Incidents prevented / 7d** – `increase(incidents_prevented_total{team="$TEAM"}[7d])`
+- **ROI time saved / 30d** – `sum_over_time(roi_time_saved_seconds{team="$TEAM", persona=~"qa|dev"}[30d])`
+- **Change failure rate** – `increase(ci_pipeline_failures_total{stage="deploy"}[30d]) / increase(ci_pipeline_deployments_total[30d])`
+- **SPACE satisfaction proxy** – `avg_over_time(telemetry_completeness_ratio{signal="sdk.event", tenant_id="$TENANT"}[7d])`
+
+Link all dashboards to the query id in `docs/development/monitoring.md` to keep audits straightforward.
 
 ### 🎯 **Exit Criteria**
 

@@ -1,8 +1,6 @@
 # Shifty Multi-Tenant SaaS Platform
 # Docker Compose for development environment
 
-version: '3.8'
-
 services:
   # Platform PostgreSQL Database
   platform-db:
@@ -53,19 +51,26 @@ services:
       - OLLAMA_MODELS=/root/.ollama/models
     networks:
       - shifty-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # GPU acceleration is optional. Remove the comment markers below and
+    # set COMPOSE_PROFILES=gpu if you want to reserve an NVIDIA device.
+    #profiles:
+    #  - gpu
+    #deploy:
+    #  resources:
+    #    reservations:
+    #      devices:
+    #        - driver: nvidia
+    #          count: 1
+    #          capabilities: [gpu]
 
   # Tenant Manager Service
   tenant-manager:
     build:
       context: .
-      dockerfile: services/tenant-manager/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/tenant-manager
+        PACKAGE_NAME: "@shifty/tenant-manager"
     container_name: shifty-tenant-manager
     ports:
       - "3001:3001"
@@ -82,15 +87,15 @@ services:
         condition: service_healthy
     networks:
       - shifty-network
-    volumes:
-      - ./services/tenant-manager:/app
-      - /app/node_modules
 
   # Auth Service
   auth-service:
     build:
       context: .
-      dockerfile: services/auth-service/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/auth-service
+        PACKAGE_NAME: "@shifty/auth-service"
     container_name: shifty-auth-service
     ports:
       - "3002:3002"
@@ -112,7 +117,10 @@ services:
   ai-orchestrator:
     build:
       context: .
-      dockerfile: services/ai-orchestrator/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/ai-orchestrator
+        PACKAGE_NAME: "@shifty/ai-orchestrator"
     container_name: shifty-ai-orchestrator
     ports:
       - "3003:3003"
@@ -136,7 +144,10 @@ services:
   test-generator:
     build:
       context: .
-      dockerfile: services/test-generator/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/test-generator
+        PACKAGE_NAME: "@shifty/test-generator"
     container_name: shifty-test-generator
     ports:
       - "3004:3004"
@@ -159,7 +170,10 @@ services:
   healing-engine:
     build:
       context: .
-      dockerfile: services/healing-engine/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/healing-engine
+        PACKAGE_NAME: "@shifty/healing-engine"
     container_name: shifty-healing-engine
     ports:
       - "3005:3005"
@@ -178,33 +192,6 @@ services:
     networks:
       - shifty-network
 
-  # Test Runner Service (Port 3006 - different from test-generator)
-  test-runner:
-    build:
-      context: .
-      dockerfile: services/test-runner/Dockerfile
-    container_name: shifty-test-runner
-    ports:
-      - "3006:3006"
-    environment:
-      - NODE_ENV=development
-      - PORT=3006
-      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
-      - REDIS_URL=redis://redis:6379
-      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
-    depends_on:
-      platform-db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      ai-orchestrator:
-        condition: service_started
-    networks:
-      - shifty-network
-    # Mount Docker socket for container-based test execution
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
   # API Gateway (Single definition - removed duplicate)
   api-gateway:
     build:
@@ -221,7 +208,6 @@ services:
       - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
       - TEST_GENERATOR_URL=http://test-generator:3004
       - HEALING_ENGINE_URL=http://healing-engine:3005
-      - TEST_RUNNER_URL=http://test-runner:3006
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
       - REDIS_URL=redis://redis:6379
     depends_on:
@@ -240,28 +226,14 @@ services:
     networks:
       - shifty-network
 
-  # Web Frontend
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    container_name: shifty-web
-    ports:
-      - "3010:3010"
-    environment:
-      - NODE_ENV=development
-      - PORT=3010
-      - NEXT_PUBLIC_API_URL=http://localhost:3000
-    depends_on:
-      - api-gateway
-    networks:
-      - shifty-network
-
   # GPU Provisioner Service
   gpu-provisioner:
     build:
       context: .
-      dockerfile: services/gpu-provisioner/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/gpu-provisioner
+        PACKAGE_NAME: "@shifty/gpu-provisioner"
     container_name: shifty-gpu-provisioner
     ports:
       - "3007:3007"
@@ -281,7 +253,10 @@ services:
   model-registry:
     build:
       context: .
-      dockerfile: services/model-registry/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/model-registry
+        PACKAGE_NAME: "@shifty/model-registry"
     container_name: shifty-model-registry
     ports:
       - "3008:3008"
@@ -307,7 +282,10 @@ services:
   data-lifecycle:
     build:
       context: .
-      dockerfile: services/data-lifecycle/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/data-lifecycle
+        PACKAGE_NAME: "@shifty/data-lifecycle"
     container_name: shifty-data-lifecycle
     ports:
       - "3009:3009"
@@ -325,7 +303,10 @@ services:
   hitl-arcade:
     build:
       context: .
-      dockerfile: services/hitl-arcade/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/hitl-arcade
+        PACKAGE_NAME: "@shifty/hitl-arcade"
     container_name: shifty-hitl-arcade
     ports:
       - "3011:3011"
@@ -343,7 +324,10 @@ services:
   cicd-governor:
     build:
       context: .
-      dockerfile: services/cicd-governor/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/cicd-governor
+        PACKAGE_NAME: "@shifty/cicd-governor"
     container_name: shifty-cicd-governor
     ports:
       - "3012:3012"
@@ -362,7 +346,10 @@ services:
   production-feedback:
     build:
       context: .
-      dockerfile: services/production-feedback/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/production-feedback
+        PACKAGE_NAME: "@shifty/production-feedback"
     container_name: shifty-production-feedback
     ports:
       - "3013:3013"
@@ -384,7 +371,10 @@ services:
   integrations:
     build:
       context: .
-      dockerfile: services/integrations/Dockerfile
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/integrations
+        PACKAGE_NAME: "@shifty/integrations"
     container_name: shifty-integrations
     ports:
       - "3014:3014"

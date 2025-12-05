@@ -13,6 +13,7 @@
 ```bash
 # Clone and setup
 git clone <repo-url> && cd shifty
+# Use Node 20.18+ / npm 10+
 npm install
 
 # Start the platform (all services)
@@ -23,6 +24,9 @@ npm install
 
 # Access the platform
 open http://localhost:3000
+
+> **Note:** The default Docker configuration now runs entirely on CPU so it works on macOS without an NVIDIA runtime. If you have a Linux host with an NVIDIA GPU and the NVIDIA Container Toolkit installed, set `COMPOSE_PROFILES=gpu` before running the scripts to re-enable GPU reservations for the Ollama service.
+> The startup script automatically builds (or refreshes when `FORCE_WORKSPACE_IMAGE=1`) the shared `shifty-workspace:node20-20251205` image. If you invoke `docker compose build` yourself, run `docker build -f Dockerfile.base -t shifty-workspace:node20-20251205 .` first to avoid repeated `npm ci` runs per service.
 ```
 
 ## 🎯 What is Shifty?

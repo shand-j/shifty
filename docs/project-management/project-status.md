@@ -10,6 +10,9 @@
 | 2 | Real Healing & Test Generation | ✅ Complete | Database persistence, tenant isolation, migrations |
 | 3 | Gateway Resilience & Observability | ✅ Complete | Circuit breaker, real metrics, CSP, improved CORS |
 | 4 | CI Fabric & SDK Foundation | ✅ Complete | SDK packages, GitHub Actions, cicd-governor endpoints |
+| 5 | Manual Session Hub & Collaboration | 📋 Planned | Manual testing view, HITL prompts, Jira integration |
+| 6 | Telemetry, ROI & Retraining Pipeline | 📋 Planned | OpenTelemetry, ROI aggregation, model retraining |
+| 7 | Docs, Runbooks & Hardening | 📋 Planned | OpenAPI specs, deployment docs, chaos testing |
 
 ---
 
@@ -192,6 +195,261 @@ RequestLimits, createValidationErrorResponse(), isValidUuid()
 | `/api/v1/ci/actions/test-heal` | POST | Heal broken selectors from CI |
 | `/api/v1/ci/actions/quality-insights` | POST | Get quality gate decisions |
 | `/api/v1/ci/status` | GET | MCP tool interface for CI status |
+
+---
+
+## 🖥️ Iteration 5 Planned: Manual Session Hub & Collaboration (PR Track 5)
+
+### 📋 **Scope**
+
+Extend React workspace with manual testing view (browser stream, steps, logs, Jira links) plus collaboration prompts.
+
+### 🎯 **Key Tasks**
+
+```
+📋 Manual Testing Hub
+   ├── Implement session CRUD via manual.sessions MCP hooks
+   ├── In-app browser with session recording capability
+   ├── Step recording with screenshots and evidence upload
+   ├── Test plan loading/creation (exploratory and scripted modes)
+   └── Session closure with ROI impact summary
+
+📋 HITL Arcade Integration
+   ├── Surface playful HITL micro-prompts
+   ├── Mission system for distributed human-in-the-loop tasks
+   ├── XP and leaderboard gamification
+   └── Dataset collection for model training
+
+📋 Collaboration Features
+   ├── Jira integration for issue creation/linking
+   ├── Threaded comments and reactions on test steps
+   ├── Persona-aware dashboards (PO, QA, Designer, GTM)
+   └── Next-best action prompts per persona
+```
+
+### 📊 **Services Involved**
+
+| Service | Port | Role |
+|---------|------|------|
+| `hitl-arcade` | 3009 | HITL missions, profiles, leaderboards, datasets |
+| `production-feedback` | 3011 | Error ingestion, clustering, regression test generation |
+| `apps/web` | 5173 | React workspace frontend (Vite dev server) |
+| `integrations` | 3010 | Jira bridge, external service connections |
+
+### ✅ **HITL Arcade Endpoints** (Already Implemented)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/profiles/:userId` | GET | Get or create user profile |
+| `/api/v1/tenants/:tenantId/missions` | POST | Create HITL mission |
+| `/api/v1/tenants/:tenantId/missions/available` | GET | Get available missions for user |
+| `/api/v1/missions/:missionId/assign` | POST | Assign mission to user |
+| `/api/v1/missions/:missionId/start` | POST | Start mission timer |
+| `/api/v1/missions/:missionId/complete` | POST | Complete mission with result |
+| `/api/v1/tenants/:tenantId/leaderboard` | GET | Get tenant leaderboard |
+| `/api/v1/tenants/:tenantId/datasets` | POST/GET | Create/list training datasets |
+
+### ✅ **Production Feedback Endpoints** (Already Implemented)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/errors` | POST | Ingest error events |
+| `/api/v1/webhooks/sentry` | POST | Sentry webhook integration |
+| `/api/v1/tenants/:tenantId/clusters` | GET | Get error clusters |
+| `/api/v1/clusters/:clusterId/status` | PATCH | Update cluster status |
+| `/api/v1/regression-tests` | POST | Generate regression tests |
+| `/api/v1/regression-tests/:testId/approve` | POST | Approve generated test |
+| `/api/v1/tenants/:tenantId/feedback-rules` | POST | Create feedback loop rules |
+| `/api/v1/clusters/:clusterId/analyze` | POST | Analyze cluster impact |
+
+### 🎯 **Exit Criteria**
+
+- [ ] Users can schedule and execute manual sessions entirely inside Shifty
+- [ ] Session telemetry captured with step-by-step recording
+- [ ] HITL prompts surface playful micro-tasks with gamification
+- [ ] Jira integration enables issue creation from test steps
+- [ ] Collaboration artifacts (comments, reactions) persisted
+
+---
+
+## 📊 Iteration 6 Planned: Telemetry, ROI & Retraining Pipeline (PR Track 6)
+
+### 📋 **Scope**
+
+Stand up OpenTelemetry collectors + Prometheus metrics, build ROI aggregation service, wire data-lifecycle/model-registry retraining triggers.
+
+### 🎯 **Key Tasks**
+
+```
+📋 Telemetry Infrastructure
+   ├── Instrument all services with OTLP exporters
+   ├── Deploy OpenTelemetry collectors for traces, metrics, logs
+   ├── Configure Prometheus scraping for metrics aggregation
+   ├── Ensure ≥95% telemetry completeness across services
+   └── Regional redundancy for collectors
+
+📋 ROI Aggregation Service (New)
+   ├── /roi/insights - Aggregated KPI bundle
+   ├── /roi/dora - Lead time, deploy freq, MTTR, change fail
+   ├── /roi/space - SPACE framework components
+   ├── /roi/incidents - Prevented incidents, bugs found
+   └── /roi/operational-cost - Time saved vs cost analysis
+
+📋 Retraining Pipeline
+   ├── Weekly cron-triggered retraining jobs
+   ├── Threshold-based retraining on quality metric breaches
+   ├── Curated dataset management via data-lifecycle
+   ├── Model versioning and rollback capabilities
+   └── Automated validation before model promotion
+```
+
+### 📊 **Services Involved**
+
+| Service | Port | Role |
+|---------|------|------|
+| `data-lifecycle` | 3008 | Retention policies, data assets, secure deletion |
+| `model-registry` | 3007 | Model versioning, training jobs, evaluations |
+| `roi` (new) | 3012 | ROI aggregation and reporting |
+| `ai-orchestrator` | 3003 | Coordination of AI operations |
+
+### ✅ **Data Lifecycle Endpoints** (Already Implemented)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/tenants/:tenantId/retention-policies` | POST/GET | Manage retention policies |
+| `/api/v1/tenants/:tenantId/assets` | POST/GET | Register/list data assets |
+| `/api/v1/tenants/:tenantId/deletion-jobs` | POST | Request data deletion |
+| `/api/v1/deletion-jobs/:jobId/execute` | POST | Execute deletion job |
+| `/api/v1/tenants/:tenantId/workspaces` | POST | Create disposable workspace |
+| `/api/v1/tenants/:tenantId/compliance-reports` | POST | Generate compliance report |
+| `/api/v1/access-logs` | POST | Log data access events |
+| `/api/v1/secure-delete` | POST | Secure deletion endpoint |
+
+### ✅ **Model Registry Endpoints** (Already Implemented)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/models` | POST | Register new model |
+| `/api/v1/models/:modelId` | GET/DELETE | Get/delete model |
+| `/api/v1/tenants/:tenantId/models` | GET | List tenant models |
+| `/api/v1/models/:modelId/deploy` | POST | Deploy model |
+| `/api/v1/tenants/:tenantId/training-jobs` | POST/GET | Start/list training jobs |
+| `/api/v1/training-jobs/:jobId` | GET | Get training job status |
+| `/api/v1/models/:modelId/evaluations` | POST/GET | Create/list evaluations |
+
+### 📈 **Telemetry Schemas** (From API Reference)
+
+#### Traces
+- `quality.session` - attrs: `persona`, `session_id`, `session_type`, `repo`, `branch`, `component`, `risk_level`
+- `ci.pipeline` - attrs: `pipeline_id`, `provider`, `stage`, `status`, `duration_ms`, `tests_total`, `tests_failed`
+- `sdk.event` - attrs: `event_type`, `tenant_id`, `sdk_version`, `latency_ms`
+
+#### Metrics
+- `quality_sessions_active{persona,repo}`
+- `tests_generated_total{repo}`
+- `tests_healed_total{repo}`
+- `ci_pipeline_duration_seconds{provider,stage}`
+- `roi_time_saved_seconds{team}`
+- `incidents_prevented_total{team}`
+
+### 🎯 **Exit Criteria**
+
+- [ ] All services instrumented with OTLP exporters
+- [ ] Telemetry completeness ≥95% for all tenant data
+- [ ] ROI endpoints return real aggregated metrics
+- [ ] DORA/SPACE dashboards populated with live data
+- [ ] Retraining pipeline runs on weekly schedule
+- [ ] Threshold-triggered retraining operational
+- [ ] Model versioning with rollback capability
+
+---
+
+## 📚 Iteration 7 Planned: Docs, Runbooks & Hardening (PR Track 7)
+
+### 📋 **Scope**
+
+Finalize documentation (OpenAPI, deployment, monitoring), add runbooks/playbooks, and execute chaos/resilience tests.
+
+### 🎯 **Key Tasks**
+
+```
+📋 Documentation
+   ├── Generate OpenAPI specs for all public services
+   ├── Update api-reference.md with complete endpoint coverage
+   ├── Finalize deployment.md with production procedures
+   ├── Document telemetry hosting decisions (managed vs self-managed)
+   └── MCP tool documentation with fallback procedures
+
+📋 Runbooks & Playbooks
+   ├── Security hotfix pipeline runbook
+   ├── CI failure triage playbook
+   ├── Manual session moderation guide
+   ├── Telemetry outage response procedures
+   ├── Incident response with escalation paths
+   └── On-call rotation documentation
+
+📋 Hardening & Resilience
+   ├── Multi-tenant chaos testing scenarios
+   ├── Service failure recovery validation
+   ├── Data sovereignty compliance verification
+   ├── Performance benchmarking under load
+   └── Security penetration testing
+```
+
+### 📊 **Artifacts to Deliver**
+
+| Artifact | Location | Description |
+|----------|----------|-------------|
+| OpenAPI Specs | `docs/api/*.yaml` | Machine-readable API definitions |
+| API Reference | `docs/architecture/api-reference.md` | Human-readable endpoint docs |
+| Deployment Guide | `docs/development/deployment.md` | Production deployment procedures |
+| Monitoring Guide | `docs/development/monitoring.md` | Observability setup and alerts |
+| System Assessment | `docs/project-management/system-assessment.md` | Architecture validation |
+| Runbooks | `runbooks/*.md` | Operational procedures |
+
+### 📋 **Runbook Templates**
+
+```
+📋 Security Hotfix Pipeline
+   ├── Trigger: Critical CVE or security alert
+   ├── Steps: ci.status → repo.fs patch → targeted tests → approval
+   └── Exit: CI green and CRITICAL issue closed
+
+📋 CI Failure Triage
+   ├── Trigger: Build or test failure in main branch
+   ├── Steps: ci.status → log analysis → telemetry.query → Jira issue
+   └── Exit: Root cause documented, fix deployed or tracked
+
+📋 Manual Session Moderation
+   ├── Trigger: New manual session started
+   ├── Steps: manual.sessions start → step logging → Jira export
+   └── Exit: ROI summary delivered, session closed
+
+📋 Telemetry Outage Response
+   ├── Trigger: Telemetry completeness < 95%
+   ├── Steps: Cached Prometheus snapshots → alert platform team
+   └── Exit: ROI reporting restored to full completeness
+```
+
+### 🔒 **Chaos Testing Scenarios**
+
+| Scenario | Target | Expected Outcome |
+|----------|--------|------------------|
+| Service crash | Any microservice | Automatic restart, no data loss |
+| Database failover | PostgreSQL primary | Seamless failover to replica |
+| Network partition | Inter-service communication | Circuit breaker activation |
+| High load | API Gateway | Rate limiting, graceful degradation |
+| Memory exhaustion | Test generator | OOM handling, job recovery |
+
+### 🎯 **Exit Criteria**
+
+- [ ] OpenAPI specs generated for all 12 services
+- [ ] Documentation aligned with shipped functionality
+- [ ] On-call playbooks complete with escalation paths
+- [ ] Multi-tenant chaos tests executed and passed
+- [ ] Platform validated under failure modes
+- [ ] Customer enablement materials ready
+- [ ] Security assessment completed
 
 ---
 

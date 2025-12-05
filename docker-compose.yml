@@ -19,6 +19,11 @@ services:
       - ./infrastructure/docker/init-platform-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - shifty-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Redis for caching and queues
   redis:
@@ -30,6 +35,11 @@ services:
       - redis_data:/data
     networks:
       - shifty-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Ollama AI Service
   ollama:
@@ -64,9 +74,12 @@ services:
       - PORT=3001
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
     depends_on:
-      - platform-db
-      - redis
+      platform-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - shifty-network
     volumes:
@@ -86,38 +99,12 @@ services:
       - PORT=3002
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-secret-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
     depends_on:
-      - platform-db
-      - redis
-    networks:
-      - shifty-network
-
-  # API Gateway
-  api-gateway:
-    build:
-      context: .
-      dockerfile: apps/api-gateway/Dockerfile
-    container_name: shifty-api-gateway
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - TENANT_MANAGER_URL=http://tenant-manager:3001
-      - AUTH_SERVICE_URL=http://auth-service:3002
-      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
-      - TEST_GENERATOR_URL=http://test-generator:3004
-      - HEALING_ENGINE_URL=http://healing-engine:3005
-      - JWT_SECRET=dev-secret-key-change-in-production
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
-      - auth-service
-      - tenant-manager
-      - ai-orchestrator
-      - test-generator
-      - healing-engine
+      platform-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - shifty-network
 
@@ -136,37 +123,16 @@ services:
       - OLLAMA_ENDPOINT=http://ollama:11434
       - REDIS_URL=redis://redis:6379
     depends_on:
-      - platform-db
-      - redis
-      - ollama
+      platform-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - shifty-network
 
-  # Test Runner Service
-  test-runner:
-    build:
-      context: .
-      dockerfile: services/test-runner/Dockerfile
-    container_name: shifty-test-runner
-    ports:
-      - "3004:3004"
-    environment:
-      - NODE_ENV=development
-      - PORT=3004
-      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
-      - REDIS_URL=redis://redis:6379
-      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
-    depends_on:
-      - platform-db
-      - redis
-      - ai-orchestrator
-    networks:
-      - shifty-network
-    # Mount Docker socket for container-based test execution
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-
-  # Test Generator Service
+  # Test Generator Service (Port 3004)
   test-generator:
     build:
       context: .
@@ -180,9 +146,12 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - OLLAMA_URL=http://ollama:11434
       - AI_MODEL=llama3.1
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
     depends_on:
-      - platform-db
-      - ollama
+      platform-db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - shifty-network
 
@@ -200,13 +169,43 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - OLLAMA_URL=http://ollama:11434
       - AI_MODEL=llama3.1
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
     depends_on:
-      - platform-db
-      - ollama
+      platform-db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - shifty-network
 
-  # API Gateway
+  # Test Runner Service (Port 3006 - different from test-generator)
+  test-runner:
+    build:
+      context: .
+      dockerfile: services/test-runner/Dockerfile
+    container_name: shifty-test-runner
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - REDIS_URL=redis://redis:6379
+      - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-orchestrator:
+        condition: service_started
+    networks:
+      - shifty-network
+    # Mount Docker socket for container-based test execution
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # API Gateway (Single definition - removed duplicate)
   api-gateway:
     build:
       context: .
@@ -223,15 +222,21 @@ services:
       - TEST_GENERATOR_URL=http://test-generator:3004
       - HEALING_ENGINE_URL=http://healing-engine:3005
       - TEST_RUNNER_URL=http://test-runner:3006
-      - JWT_SECRET=dev-secret-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
       - REDIS_URL=redis://redis:6379
     depends_on:
-      - redis
-      - tenant-manager
-      - auth-service
-      - ai-orchestrator
-      - test-generator
-      - healing-engine
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      tenant-manager:
+        condition: service_started
+      ai-orchestrator:
+        condition: service_started
+      test-generator:
+        condition: service_started
+      healing-engine:
+        condition: service_started
     networks:
       - shifty-network
 
@@ -252,11 +257,6 @@ services:
     networks:
       - shifty-network
 
-volumes:
-  platform_db_data:
-  redis_data:
-  ollama_models:
-
   # GPU Provisioner Service
   gpu-provisioner:
     build:
@@ -264,15 +264,16 @@ volumes:
       dockerfile: services/gpu-provisioner/Dockerfile
     container_name: shifty-gpu-provisioner
     ports:
-      - "3006:3006"
+      - "3007:3007"
     environment:
       - NODE_ENV=development
-      - PORT=3006
+      - PORT=3007
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - VASTAI_API_KEY=${VASTAI_API_KEY:-}
       - SHIFTY_INTERNAL_API_KEY=${SHIFTY_INTERNAL_API_KEY:-dev-internal-key}
     depends_on:
-      - platform-db
+      platform-db:
+        condition: service_healthy
     networks:
       - shifty-network
 
@@ -283,19 +284,22 @@ volumes:
       dockerfile: services/model-registry/Dockerfile
     container_name: shifty-model-registry
     ports:
-      - "3007:3007"
+      - "3008:3008"
     environment:
       - NODE_ENV=development
-      - PORT=3007
+      - PORT=3008
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN:-}
       - OLLAMA_ENDPOINT=http://ollama:11434
-      - GPU_PROVISIONER_URL=http://gpu-provisioner:3006
-      - DATA_LIFECYCLE_URL=http://data-lifecycle:3008
+      - GPU_PROVISIONER_URL=http://gpu-provisioner:3007
+      - DATA_LIFECYCLE_URL=http://data-lifecycle:3009
     depends_on:
-      - platform-db
-      - ollama
-      - gpu-provisioner
+      platform-db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      gpu-provisioner:
+        condition: service_started
     networks:
       - shifty-network
 
@@ -306,13 +310,14 @@ volumes:
       dockerfile: services/data-lifecycle/Dockerfile
     container_name: shifty-data-lifecycle
     ports:
-      - "3008:3008"
+      - "3009:3009"
     environment:
       - NODE_ENV=development
-      - PORT=3008
+      - PORT=3009
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
     depends_on:
-      - platform-db
+      platform-db:
+        condition: service_healthy
     networks:
       - shifty-network
 
@@ -323,13 +328,14 @@ volumes:
       dockerfile: services/hitl-arcade/Dockerfile
     container_name: shifty-hitl-arcade
     ports:
-      - "3009:3009"
+      - "3011:3011"
     environment:
       - NODE_ENV=development
-      - PORT=3009
+      - PORT=3011
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
     depends_on:
-      - platform-db
+      platform-db:
+        condition: service_healthy
     networks:
       - shifty-network
 
@@ -340,14 +346,15 @@ volumes:
       dockerfile: services/cicd-governor/Dockerfile
     container_name: shifty-cicd-governor
     ports:
-      - "3010:3010"
+      - "3012:3012"
     environment:
       - NODE_ENV=development
-      - PORT=3010
+      - PORT=3012
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
-      - INTEGRATIONS_URL=http://integrations:3012
+      - INTEGRATIONS_URL=http://integrations:3014
     depends_on:
-      - platform-db
+      platform-db:
+        condition: service_healthy
     networks:
       - shifty-network
 
@@ -358,16 +365,18 @@ volumes:
       dockerfile: services/production-feedback/Dockerfile
     container_name: shifty-production-feedback
     ports:
-      - "3011:3011"
+      - "3013:3013"
     environment:
       - NODE_ENV=development
-      - PORT=3011
+      - PORT=3013
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - TEST_GENERATOR_URL=http://test-generator:3004
-      - INTEGRATIONS_URL=http://integrations:3012
+      - INTEGRATIONS_URL=http://integrations:3014
     depends_on:
-      - platform-db
-      - test-generator
+      platform-db:
+        condition: service_healthy
+      test-generator:
+        condition: service_started
     networks:
       - shifty-network
 
@@ -378,17 +387,23 @@ volumes:
       dockerfile: services/integrations/Dockerfile
     container_name: shifty-integrations
     ports:
-      - "3012:3012"
+      - "3014:3014"
     environment:
       - NODE_ENV=development
-      - PORT=3012
+      - PORT=3014
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
-      - PRODUCTION_FEEDBACK_URL=http://production-feedback:3011
-      - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-http://localhost:3012}
+      - PRODUCTION_FEEDBACK_URL=http://production-feedback:3013
+      - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-http://localhost:3014}
     depends_on:
-      - platform-db
+      platform-db:
+        condition: service_healthy
     networks:
       - shifty-network
+
+volumes:
+  platform_db_data:
+  redis_data:
+  ollama_models:
 
 networks:
   shifty-network:

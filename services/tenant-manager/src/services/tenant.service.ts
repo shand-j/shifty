@@ -1,6 +1,6 @@
 import { Pool, Client } from 'pg';
 import { DatabaseManager } from '@shifty/database';
-import { Tenant, TenantSchema, TenantUtils } from '@shifty/shared';
+import { Tenant, TenantSchema, TenantUtils, getTenantDatabaseUrl } from '@shifty/shared';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface TenantProvisioningConfig {
@@ -405,14 +405,15 @@ export class TenantService {
     region?: string;
     plan?: string;
   }): Promise<Tenant> {
+    const tenantId = uuidv4();
     const tenantData = {
-      id: uuidv4(),
+      id: tenantId,
       name: data.name,
       slug: data.slug,
       region: (data.region || 'us-east-1') as 'us-east-1' | 'us-west-2' | 'eu-west-1' | 'ap-southeast-1',
       plan: (data.plan || 'starter') as 'starter' | 'professional' | 'enterprise' | 'enterprise-plus',
       status: 'active' as const,
-      databaseUrl: `postgresql://tenant:password@localhost:5432/tenant_${uuidv4()}`,
+      databaseUrl: getTenantDatabaseUrl(tenantId),
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -426,14 +427,15 @@ export class TenantService {
     region?: string;
     plan?: string;
   }): Promise<any> {
+    const tenantId = uuidv4();
     const tenantData = {
-      id: uuidv4(),
+      id: tenantId,
       name: data.name,
       slug: data.slug,
       region: (data.region || 'us-east-1') as 'us-east-1' | 'us-west-2' | 'eu-west-1' | 'ap-southeast-1',
       plan: (data.plan || 'starter') as 'starter' | 'professional' | 'enterprise' | 'enterprise-plus',
       status: 'active' as const,
-      databaseUrl: `postgresql://tenant:password@localhost:5432/tenant_${uuidv4()}`,
+      databaseUrl: getTenantDatabaseUrl(tenantId),
       createdAt: new Date(),
       updatedAt: new Date()
     };

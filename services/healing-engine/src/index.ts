@@ -5,6 +5,20 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { chromium, firefox, webkit, Browser, Page } from 'playwright';
 import jwt from 'jsonwebtoken';
+import { getJwtConfig, validateProductionConfig } from '@shifty/shared';
+
+// Validate configuration on startup
+try {
+  validateProductionConfig();
+} catch (error) {
+  console.error('Configuration validation failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
+// Get centralized JWT configuration
+const jwtConfig = getJwtConfig();
 
 const fastify = Fastify({
   logger: {
@@ -164,11 +178,8 @@ class HealingEngineService {
 
       try {
         const token = authHeader.split(' ')[1];
-        // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
-        // FIXME: Centralize with other services, use shared secret manager
-        // Effort: 30 minutes | Priority: CRITICAL
-        const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-        const decoded = jwt.verify(token, jwtSecret) as any;
+        // Use centralized JWT configuration
+        const decoded = jwt.verify(token, jwtConfig.secret) as any;
         return decoded.tenantId || 'default-tenant';
       } catch (error) {
         return null;

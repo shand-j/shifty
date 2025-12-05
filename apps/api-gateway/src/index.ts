@@ -5,7 +5,13 @@ import rateLimit from '@fastify/rate-limit';
 import proxy from '@fastify/http-proxy';
 import jwt from '@fastify/jwt';
 import { createClient } from 'redis';
-import { getJwtConfig, validateProductionConfig } from '@shifty/shared';
+import { 
+  getJwtConfig, 
+  validateProductionConfig,
+  RequestLimits,
+  safeValidateJwtPayload,
+  createValidationErrorResponse
+} from '@shifty/shared';
 
 // Validate configuration on startup
 try {
@@ -17,17 +23,13 @@ try {
   }
 }
 
-// HIGH: No request body size limits - DoS vulnerability
-// FIXME: Allows attackers to send huge payloads, exhausting memory
-// TODO: Add body limits to Fastify config:
-//   bodyLimit: 1048576 (1MB for JSON),
-//   requestTimeout: 30000 (30 seconds)
-// Impact: Service crashes via memory exhaustion attacks
-// Effort: 30 minutes | Priority: HIGH
+// Configure Fastify with proper request limits to prevent DoS attacks
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info'
-  }
+  },
+  bodyLimit: RequestLimits.bodyLimit, // 1MB limit for JSON requests
+  requestTimeout: RequestLimits.requestTimeout // 30 seconds timeout
 });
 
 interface ServiceRoute {
@@ -322,21 +324,27 @@ class APIGateway {
           try {
             await request.jwtVerify();
 
-            // CRITICAL: No input validation on JWT payload - injection risk
-            // FIXME: User can inject arbitrary tenant IDs, privilege escalation
-            // TODO: Add Zod validation:
-            //   1. Create PayloadSchema with strict types
-            //   2. Validate payload before using: PayloadSchema.parse(request.user)
-            //   3. Sanitize all string fields (tenantId, userId, role)
-            //   4. Verify tenant exists and user has access
-            // Impact: XSS, SQL injection, privilege escalation
-            // Effort: 4 hours | Priority: CRITICAL
-            const payload = request.user as any;
-            if (payload) {
-              request.headers['x-tenant-id'] = payload.tenantId;
-              request.headers['x-user-id'] = payload.userId;
-              request.headers['x-user-role'] = payload.role;
+            // Validate JWT payload structure and content using Zod schema
+            const payload = request.user as unknown;
+            const validationResult = safeValidateJwtPayload(payload);
+            
+            if (!validationResult.success) {
+              console.warn('JWT payload validation failed:', validationResult.error.errors);
+              const validationError = createValidationErrorResponse(validationResult.error);
+              return reply.status(401).send({
+                error: 'Unauthorized',
+                message: 'Invalid token payload',
+                code: validationError.code,
+                details: validationError.details
+              });
             }
+
+            const validatedPayload = validationResult.data;
+            
+            // Set validated and sanitized headers
+            request.headers['x-tenant-id'] = validatedPayload.tenantId;
+            request.headers['x-user-id'] = validatedPayload.userId;
+            request.headers['x-user-role'] = validatedPayload.role;
 
           } catch (jwtErr: any) {
             console.log('JWT verification failed:', jwtErr.message);

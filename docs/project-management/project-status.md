@@ -1,6 +1,66 @@
 # 🚀 Shifty Platform - MVP Backend Implementation Status
 
-*Last Updated: October 10, 2025*
+*Last Updated: December 5, 2025*
+
+## 🔐 Iteration 1 Complete: Secret Hygiene & Input Validation (PR Track 1)
+
+### ✅ **Critical Security Issues RESOLVED**
+
+```
+✅ Hardcoded Database Credentials
+   ├── Centralized config module in @shifty/shared/config
+   ├── validateProductionConfig() enforces env vars in production
+   ├── Fails fast on startup if secrets not configured
+   └── Safe development defaults with clear warnings
+
+✅ Hardcoded JWT Secrets  
+   ├── getJwtConfig() provides centralized JWT configuration
+   ├── Production validation rejects dev-secret values
+   ├── Minimum 32-character secret length enforced
+   └── All services now use @shifty/shared config
+
+✅ JWT Payload Validation
+   ├── JwtPayloadSchema validates userId, tenantId, role, email
+   ├── API Gateway validates all JWT payloads before use
+   ├── Prevents privilege escalation and injection attacks
+   └── createValidationErrorResponse() for consistent errors
+
+✅ Request Input Validation
+   ├── HealSelectorRequestSchema with URL domain whitelist
+   ├── sanitizeSelector() removes XSS vectors
+   ├── GenerateTestRequestSchema with length limits
+   ├── All schemas centralized in @shifty/shared/validation
+   
+✅ Request Body Size Limits  
+   ├── RequestLimits.bodyLimit = 1MB for all services
+   ├── RequestLimits.requestTimeout = 30 seconds
+   ├── Prevents DoS via memory exhaustion
+   └── Configured in Fastify and Express services
+```
+
+### 📦 **New Shared Validation Module** (`@shifty/shared/validation`)
+
+```typescript
+// JWT Payload Validation
+JwtPayloadSchema, validateJwtPayload(), safeValidateJwtPayload()
+
+// Request Validation Schemas
+HealSelectorRequestSchema, BatchHealRequestSchema, GenerateTestRequestSchema
+
+// Security Utilities  
+sanitizeSelector(), isUrlAllowed(), getAllowedDomains()
+
+// Helpers
+RequestLimits, createValidationErrorResponse(), isValidUuid()
+```
+
+### 🧪 **Test Coverage**
+
+- 43 unit tests for validation schemas
+- All tests passing
+- Covers JWT validation, selector sanitization, URL validation
+
+---
 
 ## ✅ Implementation Complete: Core MVP Backend
 

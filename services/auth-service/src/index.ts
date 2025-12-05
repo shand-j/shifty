@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@shifty/database';
 import { z } from 'zod';
-import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl } from '@shifty/shared';
+import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl, RequestLimits } from '@shifty/shared';
 
 // Validate configuration on startup
 try {
@@ -15,10 +15,13 @@ try {
   }
 }
 
+// Configure Fastify with proper request limits
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info'
-  }
+  },
+  bodyLimit: RequestLimits.bodyLimit,
+  requestTimeout: RequestLimits.requestTimeout
 });
 
 // Validation schemas

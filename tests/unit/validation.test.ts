@@ -129,24 +129,58 @@ describe('safeValidateJwtPayload', () => {
 describe('sanitizeSelector', () => {
   it('should remove javascript: protocol', () => {
     expect(sanitizeSelector('javascript:alert(1)')).toBe('alert(1)');
+    expect(sanitizeSelector('javascript :alert(1)')).toBe('alert(1)');
+    expect(sanitizeSelector('JAVASCRIPT:alert(1)')).toBe('alert(1)');
   });
 
   it('should remove data: protocol', () => {
     expect(sanitizeSelector('data:text/html')).toBe('text/html');
+    expect(sanitizeSelector('data :text/html')).toBe('text/html');
+  });
+
+  it('should remove vbscript: protocol', () => {
+    expect(sanitizeSelector('vbscript:msgbox')).toBe('msgbox');
   });
 
   it('should remove event handlers', () => {
     expect(sanitizeSelector('onclick=alert(1)')).toBe('alert(1)');
     expect(sanitizeSelector('onmouseover=evil()')).toBe('evil()');
+    expect(sanitizeSelector('ONCLICK=alert(1)')).toBe('alert(1)');
   });
 
-  it('should remove HTML tags', () => {
-    expect(sanitizeSelector('<script>evil()</script>')).toBe('');
-    expect(sanitizeSelector('<div>test</div>')).toBe('test');
+  it('should handle recursive bypass attempts for event handlers', () => {
+    // "oonclick=" -> removing "onclick=" should not leave dangerous "on" patterns
+    const result = sanitizeSelector('oonclick=alert(1)');
+    expect(result).not.toMatch(/on\w+=/i);
+  });
+
+  it('should remove angle brackets via allowlist', () => {
+    // Allowlist approach means < > are simply not included
+    const result = sanitizeSelector('<script>evil()</script>');
+    expect(result).not.toContain('<');
+    expect(result).not.toContain('>');
+    // With allowlist, only valid CSS selector characters remain
+    expect(sanitizeSelector('test<>value')).toBe('testvalue');
   });
 
   it('should remove null bytes', () => {
     expect(sanitizeSelector('test\0value')).toBe('testvalue');
+  });
+
+  it('should remove CSS expression attacks', () => {
+    expect(sanitizeSelector('expression(alert(1))')).toBe('alert(1))');
+  });
+
+  it('should block dangerous url() patterns', () => {
+    // The javascript: is removed, leaving just the rest
+    const result1 = sanitizeSelector('url(javascript:alert(1))');
+    expect(result1).not.toContain('javascript');
+    expect(result1).toBe('url(alert(1))');
+    
+    // data: is removed
+    const result2 = sanitizeSelector("url('data:text/html')");
+    expect(result2).not.toContain('data:');
+    expect(result2).toBe("url('text/html')");
   });
 
   it('should trim whitespace', () => {
@@ -168,6 +202,8 @@ describe('sanitizeSelector', () => {
     expect(sanitizeSelector('[data-testid="submit"]')).toBe('[data-testid="submit"]');
     expect(sanitizeSelector('.button.primary')).toBe('.button.primary');
     expect(sanitizeSelector('#main-content')).toBe('#main-content');
+    expect(sanitizeSelector('button:nth-child(2)')).toBe('button:nth-child(2)');
+    expect(sanitizeSelector('[aria-label*="Submit"]')).toBe('[aria-label*="Submit"]');
   });
 });
 

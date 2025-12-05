@@ -37,8 +37,10 @@ describe('TestGenerator', () => {
       expect(result.code).toBeDefined();
       expect(result.code).toContain("import { test, expect } from '@playwright/test'");
       expect(result.code).toContain(validRequest.url);
-      // The generator falls back to template but still marks as ai-enhanced when AI enhancement fails
-      expect(['template-fallback', 'ai-enhanced-template']).toContain(result.metadata.generator);
+      // When AI enhancement fails, it still returns 'ai-enhanced-template' because the base
+      // template was generated successfully. The generator only falls back to 'template-fallback'
+      // when the entire generation process fails.
+      expect(result.metadata.generator).toBe('ai-enhanced-template');
       expect(result.metadata.version).toBe('1.0.0');
       expect(result.metadata.generatedAt).toBeDefined();
     });
@@ -142,9 +144,12 @@ describe('TestGenerator', () => {
 
       const result: ValidationResult = await testGenerator.validateTest(validCode);
 
-      // The validator uses new Function() which doesn't support ES modules,
-      // so import statements are flagged as syntax errors.
-      // However, structural validation should pass (test function exists, imports present)
+      // Note: The syntax validation uses `new Function()` which doesn't support ES module
+      // imports, resulting in a syntax error. However, structural validation still works:
+      // - The test function is detected (no 'structure' error)
+      // - Imports are detected (no 'import' error)
+      // This tests that the validator correctly identifies structural elements even when
+      // syntax validation fails due to module format limitations.
       expect(result.issues.some(i => i.type === 'structure' && i.message.includes('No test function'))).toBe(false);
       expect(result.issues.some(i => i.type === 'import')).toBe(false);
       expect(result.executionTime).toBeGreaterThan(0);

@@ -329,9 +329,7 @@ describe('SelectorHealer', () => {
     });
 
     test('should parse AI response JSON correctly', async () => {
-      // The AI-powered analysis only succeeds if selector exists AND we're not on example.com
-      // Since our mock page uses createMockPage which returns a simple mock,
-      // the AI analysis may fail to find elements. Let's test the JSON parsing more directly
+      // Test JSON parsing from AI response
       const page = createMockPage({
         url: 'https://real-site.com',
         elementExists: {
@@ -353,10 +351,9 @@ describe('SelectorHealer', () => {
         'ai-powered-analysis'
       );
 
-      // AI-powered analysis returns the result even if element not found via mock locator
-      // The strategy should be set correctly
+      // Verify AI-powered strategy was used and result was processed
       expect(result.strategy).toBe('ai-powered-analysis');
-      // Alternatives should be parsed from JSON response
+      // The parseAiResponse method should extract JSON arrays from response
       expect(Array.isArray(result.alternatives)).toBe(true);
     });
   });

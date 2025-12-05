@@ -3,6 +3,17 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@shifty/database';
 import { z } from 'zod';
+import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl } from '@shifty/shared';
+
+// Validate configuration on startup
+try {
+  validateProductionConfig();
+} catch (error) {
+  console.error('Configuration validation failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
 
 const fastify = Fastify({
   logger: {
@@ -44,14 +55,13 @@ interface AuthToken {
 class AuthService {
   private dbManager: DatabaseManager;
   private jwtSecret: string;
+  private jwtConfig: ReturnType<typeof getJwtConfig>;
 
   constructor() {
     this.dbManager = new DatabaseManager();
-    // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
-    // FIXME: Must be changed before production or all auth is compromised
-    // TODO: See api-gateway JWT secret fix for implementation steps
-    // Effort: 30 minutes | Priority: CRITICAL
-    this.jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+    // Use centralized JWT configuration with production validation
+    this.jwtConfig = getJwtConfig();
+    this.jwtSecret = this.jwtConfig.secret;
   }
 
   async start() {
@@ -326,14 +336,23 @@ class AuthService {
       let tenant: any;
 
       if (userData.tenantName) {
+        // First insert the tenant with a placeholder database URL, 
+        // then update with the actual URL using the generated ID
         const tenantResult = await client.query(`
           INSERT INTO tenants (id, name, slug, plan, status, region, database_url, created_at, updated_at)
-          VALUES (gen_random_uuid(), $1, $2, 'starter', 'active', 'us-east-1', 'postgresql://tenant:password@localhost:5432/tenant_' || gen_random_uuid(), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          VALUES (gen_random_uuid(), $1, $2, 'starter', 'active', 'us-east-1', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           RETURNING *
         `, [userData.tenantName, userData.tenantName.toLowerCase().replace(/\s+/g, '-')]);
         
         tenant = tenantResult.rows[0];
         tenantId = tenant.id;
+        
+        // Update with the proper database URL using centralized config
+        const tenantDbUrl = getTenantDatabaseUrl(tenantId);
+        await client.query(`
+          UPDATE tenants SET database_url = $1 WHERE id = $2
+        `, [tenantDbUrl, tenantId]);
+        tenant.database_url = tenantDbUrl;
       } else {
         throw new Error('Tenant name is required');
       }

@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtConfig } from '@shifty/shared';
+
+// Get centralized JWT configuration
+const jwtConfig = getJwtConfig();
 
 export interface AuthRequest extends Request {
   user?: {
@@ -21,14 +25,8 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
     });
   }
 
-  // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
-  // FIXME: Same secret must be used across all services
-  // TODO: Centralize secret management, load from shared config
-  // Effort: 30 minutes | Priority: CRITICAL
-  const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-
   try {
-    const decoded = jwt.verify(token, jwtSecret) as any;
+    const decoded = jwt.verify(token, jwtConfig.secret) as any;
     req.user = {
       id: decoded.id || decoded.userId,
       email: decoded.email,
@@ -52,12 +50,8 @@ export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction
     return next(); // Continue without authentication
   }
 
-  // CRITICAL: Hardcoded JWT secret - centralize with authenticateToken
-  // Effort: 30 minutes | Priority: CRITICAL
-  const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-
   try {
-    const decoded = jwt.verify(token, jwtSecret) as any;
+    const decoded = jwt.verify(token, jwtConfig.secret) as any;
     req.user = {
       id: decoded.id || decoded.userId,
       email: decoded.email,

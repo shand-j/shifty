@@ -1,25 +1,29 @@
 import { Pool, Client, PoolClient, QueryResult } from 'pg';
-import { DatabaseConfig } from '@shifty/shared';
+import { DatabaseConfig, getDatabaseConfig, validateProductionConfig } from '@shifty/shared';
+
+// Validate configuration on startup
+try {
+  validateProductionConfig();
+} catch (error) {
+  console.error('Configuration validation failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
 
 export class DatabaseManager {
   private platformPool: Pool | null = null;
   private tenantPools: Map<string, Pool> = new Map();
 
   async initialize(): Promise<void> {
-    // CRITICAL: Hardcoded database credentials - SECURITY VULNERABILITY
-    // FIXME: Remove hardcoded credentials immediately before production
-    // TODO: Implement proper secret management:
-    //   1. Use AWS Secrets Manager or HashiCorp Vault
-    //   2. Fail startup if DATABASE_URL not set in production
-    //   3. Add env validation: if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) throw new Error('DATABASE_URL required')
-    //   4. Rotate credentials and update all references
-    // Impact: Any attacker can access entire platform database
-    // Effort: 2 hours | Priority: CRITICAL
+    // Use centralized database configuration with production validation
+    const dbConfig = getDatabaseConfig();
+    
     this.platformPool = new Pool({
-      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/shifty_platform',
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionString: dbConfig.connectionString,
+      max: dbConfig.maxConnections,
+      idleTimeoutMillis: dbConfig.idleTimeoutMillis,
+      connectionTimeoutMillis: dbConfig.connectionTimeoutMillis,
     });
 
     console.log('📊 Database Manager initialized');

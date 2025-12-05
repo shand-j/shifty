@@ -233,7 +233,7 @@ Extend React workspace with manual testing view (browser stream, steps, logs, Ji
 |---------|------|------|
 | `hitl-arcade` | 3009 | HITL missions, profiles, leaderboards, datasets |
 | `production-feedback` | 3011 | Error ingestion, clustering, regression test generation |
-| `apps/web` | TBD | React workspace frontend |
+| `apps/web` | 5173 | React workspace frontend (Vite dev server) |
 | `integrations` | 3010 | Jira bridge, external service connections |
 
 ### ✅ **HITL Arcade Endpoints** (Already Implemented)
@@ -309,7 +309,7 @@ Stand up OpenTelemetry collectors + Prometheus metrics, build ROI aggregation se
 |---------|------|------|
 | `data-lifecycle` | 3008 | Retention policies, data assets, secure deletion |
 | `model-registry` | 3007 | Model versioning, training jobs, evaluations |
-| `roi` (new) | TBD | ROI aggregation and reporting |
+| `roi` (new) | 3012 | ROI aggregation and reporting |
 | `ai-orchestrator` | 3003 | Coordination of AI operations |
 
 ### ✅ **Data Lifecycle Endpoints** (Already Implemented)

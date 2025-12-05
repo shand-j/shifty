@@ -257,6 +257,139 @@ volumes:
   redis_data:
   ollama_models:
 
+  # GPU Provisioner Service
+  gpu-provisioner:
+    build:
+      context: .
+      dockerfile: services/gpu-provisioner/Dockerfile
+    container_name: shifty-gpu-provisioner
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - VASTAI_API_KEY=${VASTAI_API_KEY:-}
+      - SHIFTY_INTERNAL_API_KEY=${SHIFTY_INTERNAL_API_KEY:-dev-internal-key}
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
+  # Model Registry Service
+  model-registry:
+    build:
+      context: .
+      dockerfile: services/model-registry/Dockerfile
+    container_name: shifty-model-registry
+    ports:
+      - "3007:3007"
+    environment:
+      - NODE_ENV=development
+      - PORT=3007
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - HUGGINGFACE_API_TOKEN=${HUGGINGFACE_API_TOKEN:-}
+      - OLLAMA_ENDPOINT=http://ollama:11434
+      - GPU_PROVISIONER_URL=http://gpu-provisioner:3006
+      - DATA_LIFECYCLE_URL=http://data-lifecycle:3008
+    depends_on:
+      - platform-db
+      - ollama
+      - gpu-provisioner
+    networks:
+      - shifty-network
+
+  # Data Lifecycle Service
+  data-lifecycle:
+    build:
+      context: .
+      dockerfile: services/data-lifecycle/Dockerfile
+    container_name: shifty-data-lifecycle
+    ports:
+      - "3008:3008"
+    environment:
+      - NODE_ENV=development
+      - PORT=3008
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
+  # HITL Arcade Service
+  hitl-arcade:
+    build:
+      context: .
+      dockerfile: services/hitl-arcade/Dockerfile
+    container_name: shifty-hitl-arcade
+    ports:
+      - "3009:3009"
+    environment:
+      - NODE_ENV=development
+      - PORT=3009
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
+  # CI/CD Governor Service
+  cicd-governor:
+    build:
+      context: .
+      dockerfile: services/cicd-governor/Dockerfile
+    container_name: shifty-cicd-governor
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=development
+      - PORT=3010
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - INTEGRATIONS_URL=http://integrations:3012
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
+  # Production Feedback Service
+  production-feedback:
+    build:
+      context: .
+      dockerfile: services/production-feedback/Dockerfile
+    container_name: shifty-production-feedback
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=development
+      - PORT=3011
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - TEST_GENERATOR_URL=http://test-generator:3004
+      - INTEGRATIONS_URL=http://integrations:3012
+    depends_on:
+      - platform-db
+      - test-generator
+    networks:
+      - shifty-network
+
+  # Integrations Service
+  integrations:
+    build:
+      context: .
+      dockerfile: services/integrations/Dockerfile
+    container_name: shifty-integrations
+    ports:
+      - "3012:3012"
+    environment:
+      - NODE_ENV=development
+      - PORT=3012
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - PRODUCTION_FEEDBACK_URL=http://production-feedback:3011
+      - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-http://localhost:3012}
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
 networks:
   shifty-network:
     driver: bridge

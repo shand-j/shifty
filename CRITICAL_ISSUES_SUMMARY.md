@@ -260,17 +260,17 @@ Priority:        - See priority levels
 
 | Priority | Count | Resolved | Remaining | Remaining Effort |
 |----------|-------|----------|-----------|------------------|
-| CRITICAL | 4 | 3 | 1 | 1 week |
-| HIGH | 12 | 1 | 11 | 3.5 weeks |
-| MEDIUM | 8 | 0 | 8 | 2 weeks |
-| **TOTAL** | **24** | **4** | **20** | **6.5 weeks** |
+| CRITICAL | 4 | 4 | 0 | 0 |
+| HIGH | 12 | 8 | 4 | 1 week |
+| MEDIUM | 8 | 3 | 5 | 1 week |
+| **TOTAL** | **24** | **15** | **9** | **2 weeks** |
 
 ## Critical Path to MVP (5 weeks)
 
 1. **Week 1**: ✅ Fix all CRITICAL security issues - **COMPLETE**
-2. **Week 2-3**: Implement core features (remove mocks)
-3. **Week 4**: Stabilization and high-priority fixes
-4. **Week 5**: Testing and deployment prep
+2. **Week 2-3**: ✅ Implement core features (database persistence, resilience) - **COMPLETE**
+3. **Week 4**: ✅ CI Fabric & SDK Foundation - **COMPLETE**
+4. **Week 5**: 🔜 Testing, docs, and deployment prep
 
 ## Iteration Progress
 
@@ -281,10 +281,28 @@ Priority:        - See priority levels
 - Request size limits configured
 - 43 unit tests added for validation
 
-### 🔜 Next: Iteration 2 (PR Track 2) - Real Healing & Test Generation
-- Remove production mocks
-- Implement real database persistence
-- Complete selector healing strategies
+### ✅ Iteration 2 (PR Track 2) - Real Healing & Test Generation
+- Database persistence implemented for healing attempts
+- Database persistence implemented for test generation requests
+- New migrations (007, 008) for tenant data tables
+- HealingAttemptsRepository and TestGenerationRequestsRepository added
+- Tenant-aware queries with proper isolation
+- Graceful fallback to console logging when DB unavailable
+
+### ✅ Iteration 3 (PR Track 3) - Gateway Resilience & Observability
+- CSP headers enabled with secure defaults
+- Circuit breaker implementation for service calls
+- Redis-backed rate limiting with per-tenant keys
+- Real metrics collection (request counts, latency, service breakdown)
+- Improved CORS configuration with production validation
+- Health checks now include circuit breaker status
+
+### ✅ Iteration 4 (PR Track 4) - CI Fabric & SDK Foundation
+- @shifty/sdk-core package created (auth, telemetry, API client)
+- @shifty/sdk-playwright package created (fixtures, auto-healing)
+- GitHub Actions workflows: test-gen, test-heal, quality insights
+- CI/CD Governor endpoints for GitHub Actions integration
+- MCP tool interface (ci.status) implemented
 
 ## Recommended Extensions
 
@@ -305,4 +323,4 @@ The following VS Code extensions help highlight these issues:
 
 **Last Updated**: 2025-12-05  
 **Reviewed By**: AI Technical Reviewer  
-**Status**: 🔄 Iteration 1 Complete - 3 of 4 CRITICAL issues resolved
+**Status**: ✅ Iterations 1-4 Complete - All PR Tracks 1-4 implemented

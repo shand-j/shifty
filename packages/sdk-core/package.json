@@ -1,0 +1,38 @@
+{
+  "name": "@shifty/sdk-core",
+  "version": "1.0.0",
+  "description": "Core SDK for Shifty AI-Powered Testing Platform - Auth client, telemetry emitters, persona helpers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.45.0",
+    "@opentelemetry/resources": "^1.18.0",
+    "@opentelemetry/sdk-trace-base": "^1.18.0",
+    "@opentelemetry/semantic-conventions": "^1.18.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "shifty",
+    "testing",
+    "sdk",
+    "telemetry",
+    "opentelemetry"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shifty-ai/shifty.git",
+    "directory": "packages/sdk-core"
+  },
+  "license": "MIT"
+}

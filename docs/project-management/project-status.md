@@ -2,6 +2,17 @@
 
 *Last Updated: December 5, 2025*
 
+## 📊 Iteration Progress Summary
+
+| Iteration | PR Track | Status | Description |
+|-----------|----------|--------|-------------|
+| 1 | Secret Hygiene & Input Validation | ✅ Complete | Security hardening, Zod validation, centralized config |
+| 2 | Real Healing & Test Generation | ✅ Complete | Database persistence, tenant isolation, migrations |
+| 3 | Gateway Resilience & Observability | ✅ Complete | Circuit breaker, real metrics, CSP, improved CORS |
+| 4 | CI Fabric & SDK Foundation | ✅ Complete | SDK packages, GitHub Actions, cicd-governor endpoints |
+
+---
+
 ## 🔐 Iteration 1 Complete: Secret Hygiene & Input Validation (PR Track 1)
 
 ### ✅ **Critical Security Issues RESOLVED**
@@ -59,6 +70,128 @@ RequestLimits, createValidationErrorResponse(), isValidUuid()
 - 43 unit tests for validation schemas
 - All tests passing
 - Covers JWT validation, selector sanitization, URL validation
+
+---
+
+## 🔧 Iteration 2 Complete: Real Healing & Test Generation (PR Track 2)
+
+### ✅ **Database Persistence Implemented**
+
+```
+✅ Healing Attempts Persistence
+   ├── New HealingAttemptsRepository class in @shifty/database
+   ├── CREATE/READ operations with tenant isolation
+   ├── Real-time stats aggregation (success rate, strategies)
+   └── Fallback logging on database unavailability
+
+✅ Test Generation Requests Persistence
+   ├── New TestGenerationRequestsRepository class in @shifty/database
+   ├── CREATE/UPDATE/READ operations with status tracking
+   ├── History retrieval with pagination
+   └── Memory-based tenant mapping for async operations
+
+✅ New Database Migrations (007, 008)
+   ├── tenant_data.healing_attempts table
+   │   ├── tenant_id, url, selectors, success, strategy
+   │   ├── Indexed by tenant_id, success, strategy, created_at
+   │   └── Full audit trail for analytics
+   ├── tenant_data.test_generation_requests table
+   │   ├── tenant_id, url, requirements, status, generated_code
+   │   ├── Indexed by tenant_id, status, test_type, created_at
+   │   └── Supports async generation workflow
+```
+
+### 📊 **Services Updated**
+
+| Service | Changes |
+|---------|---------|
+| `healing-engine` | Added `HealingAttemptsRepository`, real `logHealingAttempt()`, real `getHealingStats()` |
+| `test-generator` | Added `TestGenerationRequestsRepository`, real persistence for generation workflow |
+| `@shifty/database` | New repositories, migrations 007 and 008 |
+
+---
+
+## 🛡️ Iteration 3 Complete: Gateway Resilience & Observability (PR Track 3)
+
+### ✅ **API Gateway Hardening**
+
+```
+✅ Content Security Policy (CSP) Enabled
+   ├── Strict directives: default-src 'self', script-src 'self'
+   ├── XSS protection headers enabled
+   ├── Report-only mode in non-production
+   └── HSTS for production deployments
+
+✅ Improved CORS Configuration
+   ├── Production validation for ALLOWED_ORIGINS
+   ├── Restricted methods: GET, POST, PUT, DELETE, PATCH
+   ├── Explicit allowed/exposed headers
+   └── Preflight caching (24h)
+
+✅ Circuit Breaker Implementation
+   ├── Per-service failure tracking
+   ├── States: closed → open → half-open → closed
+   ├── Configurable failure threshold (default: 5)
+   ├── Automatic recovery testing after timeout
+   └── Status exposed in health checks
+
+✅ Real Metrics Collection
+   ├── Request counting by service and status code
+   ├── Latency tracking with rolling window
+   ├── Requests per minute calculation
+   └── Service breakdown in /api/v1/metrics
+
+✅ Redis-Backed Rate Limiting
+   ├── Per-tenant rate limiting (keyGenerator)
+   ├── Redis store when available, memory fallback
+   └── Proper rate limit headers
+```
+
+### 📈 **New Endpoints**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Now includes circuit breaker status per service |
+| `GET /api/v1/services/health` | Circuit breaker state and real response times |
+| `GET /api/v1/metrics` | Real metrics: request counts, latency, service breakdown |
+
+---
+
+## 🚀 Iteration 4 Complete: CI Fabric & SDK Foundation (PR Track 4)
+
+### ✅ **New SDK Packages**
+
+```
+📦 @shifty/sdk-core
+   ├── ShiftySDK - Main SDK class
+   ├── ShiftyAuthClient - API key authentication
+   ├── ShiftyTelemetryClient - OpenTelemetry integration
+   ├── ShiftyApiClient - Test generation & healing APIs
+   └── Environment variable configuration
+
+📦 @shifty/sdk-playwright
+   ├── createShiftyTest() - Custom test fixture factory
+   ├── ShiftyPage - Auto-healing page wrapper
+   ├── shiftyExpect - Self-healing assertion helpers
+   └── Screenshot upload integration
+```
+
+### ✅ **GitHub Actions Workflows**
+
+| Workflow | File | Purpose |
+|----------|------|---------|
+| Test Generation | `.github/workflows/shifty-test-gen.yml` | Auto-generate tests from comments or manual trigger |
+| Test Healing | `.github/workflows/shifty-test-heal.yml` | Heal broken selectors on test failures |
+| Quality Insights | `.github/workflows/shifty-quality.yml` | Quality gate with PR comments and checks |
+
+### ✅ **CI/CD Governor Endpoints**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/ci/actions/test-gen` | POST | Trigger test generation from CI |
+| `/api/v1/ci/actions/test-heal` | POST | Heal broken selectors from CI |
+| `/api/v1/ci/actions/quality-insights` | POST | Get quality gate decisions |
+| `/api/v1/ci/status` | GET | MCP tool interface for CI status |
 
 ---
 

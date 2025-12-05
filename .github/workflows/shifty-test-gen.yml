@@ -1,0 +1,190 @@
+# Shifty Test Generation GitHub Action
+# 
+# This workflow uses Shifty AI to automatically generate Playwright tests
+# based on coverage gaps or explicit test requirements.
+#
+# Usage:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Configure the trigger conditions below
+#   3. Review and merge generated tests from PR
+
+name: Shifty Test Generation
+
+on:
+  # Trigger on PR comments requesting test generation
+  issue_comment:
+    types: [created]
+  
+  # Manual trigger with test requirements
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Target URL for test generation'
+        required: true
+        type: string
+      requirements:
+        description: 'Test requirements in natural language'
+        required: true
+        type: string
+      test_type:
+        description: 'Type of test to generate'
+        required: false
+        type: choice
+        options:
+          - e2e
+          - integration
+          - smoke
+          - regression
+        default: e2e
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+
+jobs:
+  generate-tests:
+    runs-on: ubuntu-latest
+    
+    # Only run if triggered by workflow_dispatch or a /shifty-generate comment
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && 
+       contains(github.event.comment.body, '/shifty-generate'))
+    
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Parse comment for requirements
+        if: github.event_name == 'issue_comment'
+        id: parse_comment
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          # Extract URL (first URL in comment after /shifty-generate)
+          URL=$(echo "$COMMENT" | grep -oP '/shifty-generate\s+\K(https?://[^\s]+)' || echo "")
+          # Extract requirements (text after URL)
+          REQUIREMENTS=$(echo "$COMMENT" | sed 's|/shifty-generate\s*https\?://[^\s]*\s*||')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "requirements=$REQUIREMENTS" >> $GITHUB_OUTPUT
+
+      - name: Validate Tenant Configuration
+        run: |
+          if [ -z "${{ secrets.SHIFTY_TENANT_ID }}" ]; then
+            echo "::error::SHIFTY_TENANT_ID secret is not configured. Please set up the tenant ID in repository secrets."
+            exit 1
+          fi
+
+      - name: Call Shifty Test Generation API
+        id: generate
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          URL="${{ github.event.inputs.url || steps.parse_comment.outputs.url }}"
+          REQUIREMENTS="${{ github.event.inputs.requirements || steps.parse_comment.outputs.requirements }}"
+          TEST_TYPE="${{ github.event.inputs.test_type || 'e2e' }}"
+          
+          if [ -z "$URL" ]; then
+            echo "Error: URL is required"
+            exit 1
+          fi
+          
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/ci/actions/test-gen" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID}" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"commitSha\": \"${{ github.sha }}\",
+              \"url\": \"${URL}\",
+              \"requirements\": \"${REQUIREMENTS}\",
+              \"testType\": \"${TEST_TYPE}\"
+            }")
+          
+          REQUEST_ID=$(echo $RESPONSE | jq -r '.requestId')
+          echo "request_id=$REQUEST_ID" >> $GITHUB_OUTPUT
+          
+          # Poll for completion (max 5 minutes)
+          for i in {1..30}; do
+            sleep 10
+            STATUS_RESPONSE=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/tests/generate/${REQUEST_ID}/status" \
+              -H "X-API-Key: ${SHIFTY_API_KEY}" \
+              -H "X-Tenant-ID: ${SHIFTY_TENANT_ID}")
+            
+            STATUS=$(echo $STATUS_RESPONSE | jq -r '.status')
+            
+            if [ "$STATUS" = "completed" ]; then
+              echo "code<<EOF" >> $GITHUB_OUTPUT
+              echo $STATUS_RESPONSE | jq -r '.generatedCode' >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              break
+            elif [ "$STATUS" = "failed" ]; then
+              echo "Test generation failed"
+              echo $STATUS_RESPONSE | jq -r '.error'
+              exit 1
+            fi
+          done
+
+      - name: Create test file
+        if: steps.generate.outputs.code
+        run: |
+          # Create tests directory if it doesn't exist
+          mkdir -p tests/generated
+          
+          # Generate filename based on timestamp
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          FILENAME="tests/generated/shifty_generated_${TIMESTAMP}.spec.ts"
+          
+          # Write generated code to file
+          echo "${{ steps.generate.outputs.code }}" > "$FILENAME"
+          
+          echo "Generated test file: $FILENAME"
+
+      - name: Create Pull Request
+        if: steps.generate.outputs.code
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "test: add Shifty AI-generated test"
+          title: "[Shifty] AI-Generated Test"
+          body: |
+            ## 🤖 Shifty AI-Generated Test
+            
+            This PR was automatically generated by Shifty's test generation engine.
+            
+            **Request ID:** ${{ steps.generate.outputs.request_id }}
+            **URL:** ${{ github.event.inputs.url || steps.parse_comment.outputs.url }}
+            **Test Type:** ${{ github.event.inputs.test_type || 'e2e' }}
+            
+            ### Requirements
+            ${{ github.event.inputs.requirements || steps.parse_comment.outputs.requirements }}
+            
+            ---
+            
+            Please review the generated test and make any necessary adjustments before merging.
+          branch: shifty/generated-test-${{ github.run_id }}
+          labels: |
+            shifty
+            ai-generated
+            test
+
+      - name: Add comment to issue
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Shifty test generation complete! A pull request has been created with the generated test.'
+            })

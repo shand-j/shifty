@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { DatabaseManager } from '@shifty/database';
+import { DatabaseManager, HealingAttemptsRepository, HealingAttemptRecord } from '@shifty/database';
 import { SelectorHealer, HealingResult as CoreHealingResult } from './core/selector-healer.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -86,13 +86,26 @@ interface PageAnalysis {
 class HealingEngineService {
   private dbManager: DatabaseManager;
   private selectorHealer: SelectorHealer;
+  private healingRepo: HealingAttemptsRepository;
+  // Configuration for tenant database URLs - in production, this would come from tenant manager
+  private tenantDbUrlTemplate: string;
 
   constructor() {
     this.dbManager = new DatabaseManager();
+    this.healingRepo = new HealingAttemptsRepository(this.dbManager);
     this.selectorHealer = new SelectorHealer({
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       model: process.env.AI_MODEL || 'llama3.1'
     });
+    
+    // Template for tenant database URLs
+    // In production, TENANT_DB_URL_TEMPLATE must be configured
+    if (process.env.NODE_ENV === 'production' && !process.env.TENANT_DB_URL_TEMPLATE) {
+      console.warn('⚠️ WARNING: TENANT_DB_URL_TEMPLATE not configured in production');
+    }
+    this.tenantDbUrlTemplate = process.env.TENANT_DB_URL_TEMPLATE || 
+      process.env.DATABASE_URL || 
+      'postgresql://localhost:5432/shifty_tenant_{tenantId}';
   }
 
   async start() {
@@ -651,47 +664,77 @@ class HealingEngineService {
     };
   }
 
+  /**
+   * Get tenant database URL for a given tenant.
+   * In production, this would fetch from tenant manager service.
+   */
+  private getTenantDbUrl(tenantId: string): string {
+    return this.tenantDbUrlTemplate.replace('{tenantId}', tenantId);
+  }
+
   private async logHealingAttempt(tenantId: string, attempt: any): Promise<void> {
-    // HIGH: No database persistence - tenant data not stored
-    // FIXME: Console logs disappear on restart, no analytics possible
-    // TODO: Implement real database writes:
-    //   1. Use DatabaseManager.getTenantPool(tenantId)
-    //   2. INSERT into healing_attempts table with all attempt data
-    //   3. Add proper error handling and retries
-    //   4. Ensure tenant isolation (separate schemas/databases)
-    // Impact: Multi-tenancy doesn't work, no audit trail, no analytics
-    // Effort: 1 day | Priority: HIGH
-    console.log(`Logging healing attempt for tenant ${tenantId}:`, attempt);
-    
-    // For MVP, we'll use console logging
-    // In production, this would store in the tenant's database
+    try {
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      
+      await this.healingRepo.create(tenantId, dbUrl, {
+        tenantId,
+        url: attempt.url,
+        originalSelector: attempt.originalSelector,
+        healedSelector: attempt.healedSelector,
+        success: attempt.success,
+        confidence: attempt.confidence || 0,
+        strategy: attempt.strategy,
+        executionTime: attempt.executionTime,
+        errorMessage: attempt.error,
+        browserType: attempt.browserType || 'chromium'
+      });
+
+      console.log(`✅ Healing attempt logged for tenant ${tenantId}`);
+    } catch (error) {
+      // Log error but don't fail the request - persistence is best-effort
+      console.error(`Failed to persist healing attempt for tenant ${tenantId}:`, error);
+      // Fallback to console logging for debugging
+      console.log(`[FALLBACK] Healing attempt for tenant ${tenantId}:`, JSON.stringify(attempt));
+    }
   }
 
   private async getHealingStats(tenantId: string): Promise<any> {
-    // HIGH: Mock analytics - dashboard shows fake data
-    // FIXME: Returns random data, not actual tenant metrics
-    // TODO: Query real database for stats:
-    //   1. SELECT COUNT(*), AVG(execution_time), success_rate FROM healing_attempts WHERE tenant_id = $1
-    //   2. GROUP BY strategy to get mostCommonStrategies
-    //   3. Join with tests table to get affectedTests
-    //   4. Add time-range filters for trending
-    // Impact: Platform appears to work but provides no real insights
-    // Effort: 2 days | Priority: HIGH
-    console.log(`Getting healing stats for tenant ${tenantId}`);
-    
-    // For MVP, return mock stats
-    // In production, this would query the database for actual statistics
-    return {
-      totalHealingAttempts: 42,
-      successRate: 85.7,
-      averageHealingTime: 1250,
-      mostCommonStrategies: [
-        { strategy: 'data-testid-fallback', count: 15 },
-        { strategy: 'text-content-matching', count: 12 },
-        { strategy: 'css-hierarchy-analysis', count: 10 }
-      ],
-      recentAttempts: []
-    };
+    try {
+      const dbUrl = this.getTenantDbUrl(tenantId);
+      const stats = await this.healingRepo.getStats(tenantId, dbUrl);
+
+      return {
+        totalHealingAttempts: stats.totalAttempts,
+        successRate: stats.successRate,
+        averageHealingTime: stats.averageExecutionTime,
+        mostCommonStrategies: stats.strategyBreakdown.map(s => ({
+          strategy: s.strategy,
+          count: s.count,
+          successRate: s.successRate
+        })),
+        recentAttempts: stats.recentAttempts.map(a => ({
+          id: a.id,
+          originalSelector: a.originalSelector,
+          healedSelector: a.healedSelector,
+          success: a.success,
+          strategy: a.strategy,
+          executionTime: a.executionTime,
+          createdAt: a.createdAt
+        }))
+      };
+    } catch (error) {
+      // Fallback to mock stats if database is unavailable
+      console.error(`Failed to get healing stats for tenant ${tenantId}:`, error);
+      return {
+        totalHealingAttempts: 0,
+        successRate: 0,
+        averageHealingTime: 0,
+        mostCommonStrategies: [],
+        recentAttempts: [],
+        _fallback: true,
+        _error: 'Database unavailable'
+      };
+    }
   }
 
   async stop() {

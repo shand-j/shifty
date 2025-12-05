@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import proxy from '@fastify/http-proxy';
 import jwt from '@fastify/jwt';
-import { createClient } from 'redis';
+import Redis from 'ioredis';
 import { 
   getJwtConfig, 
   validateProductionConfig,
@@ -229,9 +229,7 @@ class MetricsCollector {
 }
 
 class APIGateway {
-  private redis = createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379'
-  });
+  private redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
   private circuitBreaker = new CircuitBreaker({
     failureThreshold: 5,
@@ -280,7 +278,7 @@ class APIGateway {
 
   async start() {
     try {
-      await this.redis.connect();
+      await this.redis.ping();
 
       await this.registerMiddleware();
       await this.registerRoutes();
@@ -375,7 +373,7 @@ class APIGateway {
 
     // Try to use Redis for rate limiting if available
     try {
-      if (this.redis.isReady) {
+      if (this.redis.status === 'ready') {
         rateLimitConfig.redis = this.redis;
         console.log('✅ Rate limiting using Redis store');
       }

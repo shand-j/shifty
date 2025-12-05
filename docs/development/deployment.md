@@ -441,6 +441,48 @@ jobs:
 ./scripts/rollback-deployment.sh
 ```
 
+## ⚙️ CI Fabric Workflows
+
+The CI Fabric is GitHub-first. Three reusable actions live under `.github/workflows/` and call into `cicd-governor` + ROI services. Each action requires `${{ secrets.SHIFTY_API_KEY }}` and the standard `X-Tenant-ID` header.
+
+### Workflow Catalog
+
+| Workflow | File | Trigger(s) | Purpose |
+|----------|------|------------|---------|
+| Test Generation | `.github/workflows/shifty-test-gen.yml` | `workflow_dispatch`, `issue_comment`, `pull_request` (label: `ai-tests`) | Generates Playwright tests for the diff or referenced requirement block.
+| Test Healing | `.github/workflows/shifty-test-heal.yml` | `workflow_dispatch`, `workflow_run` (on failed Playwright job) | Sends failing selectors/logs to healing engine and applies patches as PR suggestions.
+| Quality Insights | `.github/workflows/shifty-quality.yml` | `pull_request`, `schedule` (hourly) | Aggregates cicd-governor signals + ROI KPIs to gate merges with a PR comment + status check.
+
+### GitHub Action Contracts
+
+**Test Generation (`shifty-test-gen.yml`)**
+- **Inputs:** `target_ref` (branch), `requirements` (string or file path), `coverage_gaps` (JSON). Defaults provided for manual dispatch.
+- **Secrets:** `SHIFTY_API_KEY`, `OPENAI_API_KEY` (optional for hybrid prompts).
+- **Outputs:** `generated_tests_path` (artifact), `summary_markdown` (step output used in PR comment).
+- **Flow:** Checkout → gather diff metadata → call `/ci/actions/test-gen` → upload artifact → comment summary.
+
+**Test Healing (`shifty-test-heal.yml`)**
+- **Inputs:** `failure_artifact` (artifact name), `tests_scope` (glob), `apply_patch` (bool, default false).
+- **Secrets:** `SHIFTY_API_KEY`.
+- **Outputs:** `healed_patch_path`, `confidence_score`.
+- **Flow:** Download failure logs → send to `/ci/actions/test-heal` → post suggested patch; optionally auto-commit when `apply_patch=true` on trusted branches.
+
+**Quality Insights (`shifty-quality.yml`)**
+- **Inputs:** `min_coverage` (default 0.75), `max_ci_duration` (minutes), `block_on_failed_tests` (bool).
+- **Secrets:** `SHIFTY_API_KEY`, `GITHUB_TOKEN` (default) for PR status updates.
+- **Outputs:** `gate_status` (pass/warn/fail), `insight_report` (markdown).
+- **Flow:** Run tests → call `/ci/actions/quality-insights` with pipeline metadata → fail PR if gate is `fail`, attach ROI metrics/trends to the PR comment.
+
+All three workflows emit `ci.pipeline` spans plus Prometheus metrics so DORA dashboards can reason over pipeline health.
+
+### Roadmap: GitLab & CircleCI
+
+- **GitLab:** Mirrored templates will live under `tools/ci/gitlab/` once runner availability is finalized. They will shell out to the same `cicd-governor` endpoints with personal-access tokens stored as masked variables.
+- **CircleCI:** Orb under `tools/ci/circle/shifty-ci-fabric.yml` will expose the same three jobs; uses Circle contexts for secrets and maps job status back into `ci.pipeline` spans.
+- **Timeline:** Specs finalized during Iteration 4; implementation begins once GitHub GA feedback stabilizes (target P2 exit).
+
+Document updates here whenever new providers hit GA to keep enablement consistent.
+
 ---
 
 ## 🚨 Troubleshooting

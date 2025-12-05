@@ -96,6 +96,81 @@ shifty/
     └── config/               # Test configuration
 ```
 
+
+## 📡 Telemetry Hosting & Schema
+
+### Hosting Decision
+
+| Option | Pros | Cons | Default |
+|--------|------|------|---------|
+| Managed Cortex/Mimir SaaS | Low operational overhead, elastic scale, managed TLS | Higher cost, vendor residency constraints | ✅ Primary |
+| Self-managed Prometheus/Tempo/Loki on K8s | Full control, custom retention/SRAs | Higher ops burden, patching responsibility | For sovereignty mandates |
+
+**Decision (Dec 2025):** Managed Cortex/Mimir SaaS remains the default. We deploy dual OTLP collectors per region (US/EU) behind `otel-gateway.shifty.dev`, replicate metrics to Cortex every 15 seconds, and archive traces/logs to encrypted object storage for 180 days. Sovereignty-blocked tenants receive a self-managed stack with the same schema plus customer-managed KMS.
+
+**Retention & Reliability Targets**
+
+- Traces: 30 days hot, 180 days cold archive (data-lifecycle handles secure delete SLA).
+- Metrics: 90 days, down-sampled after day 30 for cost control.
+- Logs: 180 days in Loki-compatible storage with PII scrubbing before export.
+- Telemetry completeness alert when `telemetry_completeness_ratio < 0.95` for any tenant for >15 minutes.
+
+### Schema Snapshot
+
+| Signal | Name | Required Attributes | Notes |
+|--------|------|---------------------|-------|
+| Trace | `quality.session` | `session_id`, `tenant_id`, `persona`, `session_type`, `repo`, `branch`, `component`, `risk_level`, `start_ts`, `end_ts` | Captures manual/QA sessions powering manual hub analytics and ROI attribution. |
+| Trace | `manual.step` | `session_id`, `step_id`, `sequence`, `action_type`, `component`, `jira_issue_id?`, `confidence` | Linked to manual session steps and training artifacts. |
+| Trace | `ci.pipeline` | `pipeline_id`, `provider`, `repo`, `branch`, `stage`, `status`, `duration_ms`, `tests_total`, `tests_failed`, `commit_sha` | Drives DORA metrics and CI gating.
+| Trace | `sdk.event` | `event_type`, `tenant_id`, `sdk_version`, `language`, `framework`, `latency_ms`, `result` | Emitted by `@shifty/sdk-*` packages and Playwright fixtures.
+| Trace | `roi.calculation` | `tenant_id`, `team`, `timeframe`, `kpi`, `telemetry_completeness` | Marks ROI aggregation jobs so dashboards show freshness.
+| Metric | `quality_sessions_active` | `persona`, `repo` | Gauge for manual hub occupancy.
+| Metric | `tests_generated_total` | `repo`, `framework`, `model` | Counter for AI generation throughput.
+| Metric | `tests_healed_total` | `repo`, `strategy`, `browser` | Counter fueling automation ROI.
+| Metric | `ci_pipeline_duration_seconds` | `provider`, `stage`, `repo` | Histogram referenced by DORA lead-time queries.
+| Metric | `roi_time_saved_seconds` | `team`, `persona`, `activity` | Counter representing automation time saved.
+| Metric | `telemetry_completeness_ratio` | `tenant_id`, `signal` | Gauge gating ROI/DORA reports; must stay ≥0.95.
+| Log | Manual steps | `step_id`, `session_id`, `action`, `expected`, `actual`, `attachments[]` | Stored until session closure, then exported to data-lifecycle for retraining.
+| Log | HITL prompts | `task_id`, `persona`, `tenant_id`, `prompt_type`, `time_to_complete`, `outcome` | Powers HITL Arcade analytics.
+
+### ROI Metric Query Heads
+
+All PromQL examples live in `docs/development/monitoring.md`. Key expressions used by dashboards:
+
+1. **Time-to-first insight (TTFI)** – 95th percentile from commit to actionable insight should remain under 10 minutes:
+  ```promql
+  histogram_quantile(
+    0.95,
+    sum(rate(ci_pipeline_duration_seconds_bucket{stage="insight"}[5m])) by (le)
+  )
+  ```
+
+2. **Incidents prevented** – aggregated weekly per team, only surfaced if telemetry completeness is healthy:
+  ```promql
+  increase(incidents_prevented_total{team="$TEAM"}[7d])
+  ```
+
+3. **ROI time saved** – 30-day rolling sum for QA/Dev personas:
+  ```promql
+  sum_over_time(roi_time_saved_seconds{team="$TEAM", persona=~"qa|dev"}[30d])
+  ```
+
+4. **Change failure rate (DORA)**
+  ```promql
+  (
+    increase(ci_pipeline_failures_total{stage="deploy"}[30d]) /
+    increase(ci_pipeline_deployments_total[30d])
+  )
+  ```
+
+5. **SPACE satisfaction proxy** – average SDK telemetry completeness over 7 days per tenant:
+  ```promql
+  avg_over_time(telemetry_completeness_ratio{signal="sdk.event", tenant_id="$TENANT"}[7d])
+  ```
+
+Dashboards and ROI exports must label each KPI with its query id + telemetry completeness guard so reviewers can trace the data lineage.
+
+---
 ---
 
 ## ✅ Strengths

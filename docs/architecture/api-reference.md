@@ -371,6 +371,52 @@ GET /health
 
 ---
 
+## 📡 Telemetry Contracts
+
+All services emit OpenTelemetry traces/metrics/logs through the shared collector tier. Use the schema below to ensure instrumentation stays consistent and training-ready.
+
+### Traces
+
+| Span Name | Purpose | Required Attributes |
+|-----------|---------|---------------------|
+| `quality.session` | Manual or exploratory session lifecycle from the workspace UI or MCP tooling. | `session_id`, `tenant_id`, `persona`, `session_type`, `repo`, `branch`, `component`, `risk_level`, `start_ts`, `end_ts` |
+| `ci.pipeline` | Any CI/CD run processed by `cicd-governor` or GitHub Actions. | `pipeline_id`, `provider`, `repo`, `branch`, `stage`, `status`, `duration_ms`, `tests_total`, `tests_failed`, `commit_sha` |
+| `sdk.event` | SDK and Playwright kit emissions for training/telemetry completeness. | `event_type`, `tenant_id`, `sdk_version`, `language`, `framework`, `latency_ms`, `result` |
+| `manual.step` | Individual manual testing steps captured in the session hub. | `session_id`, `step_id`, `sequence`, `action_type`, `component`, `jira_issue_id?`, `confidence` |
+| `roi.calculation` | ROI service aggregation requests. | `tenant_id`, `team`, `timeframe`, `kpi`, `telemetry_completeness` |
+
+**Collector expectations**
+
+- **Protocol:** OTLP/gRPC preferred (HTTP fallback allowed for SDKs).
+- **Resource attrs:** Always include `service.name`, `service.version`, `deployment.environment`, and `x-tenant-id`.
+- **Sampling:** Head-based 100% for `quality.session`, 10% minimum for other spans until load testing says otherwise.
+
+### Metrics
+
+| Metric | Type | Labels | Notes |
+|--------|------|--------|-------|
+| `quality_sessions_active` | Gauge | `persona`, `repo` | Live manual sessions per persona.
+| `tests_generated_total` | Counter | `repo`, `framework`, `model` | Incremented by test generator outputs.
+| `tests_healed_total` | Counter | `repo`, `strategy`, `browser` | Emitted by healing engine and SDK auto-heal flows.
+| `ci_pipeline_duration_seconds` | Histogram | `provider`, `stage`, `repo` | Scraped from `cicd-governor` span events.
+| `roi_time_saved_seconds` | Counter | `team`, `persona`, `activity` | Derived from automation vs manual deltas.
+| `incidents_prevented_total` | Counter | `team`, `severity` | Logged when regression tests catch failures.
+| `telemetry_completeness_ratio` | Gauge | `tenant_id`, `signal` | 0–1 ratio used to gate ROI reporting.
+
+Prometheus scrapes the collector’s metrics endpoint every 15s and retains metrics for 90 days; highly-cardinal metrics (e.g., `manual.step` detail) must be exported as traces/logs instead.
+
+### Logs & Events
+
+- **Manual steps:** JSON payload `{step_id, session_id, sequence, action, expected, actual, attachments[], jira_issue_id?, confidence}` stored until session closure and forwarded to data-lifecycle.
+- **HITL prompts:** `{task_id, persona, tenant_id, prompt_type, time_to_complete, outcome}` to correlate HITL Arcade participation.
+- **CI governor decisions:** `{pipeline_id, gate, status, failure_reason?, recommendation}` for auditability.
+
+Retention policy: traces 30 days (hot) + 180 days cold archive, metrics 90 days, logs 180 days in object storage via data-lifecycle policies.
+
+See `docs/development/monitoring.md` for PromQL examples mapped to these metrics.
+
+---
+
 ## ❌ Error Responses
 
 All APIs use consistent error formatting:

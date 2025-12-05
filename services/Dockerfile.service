@@ -1,6 +1,10 @@
 ARG NODE_VERSION=20
+ARG SERVICE_PATH
+ARG PACKAGE_NAME
 
 FROM shifty-workspace:node20-20251205 AS builder
+ARG SERVICE_PATH
+ARG PACKAGE_NAME
 WORKDIR /workspace
 
 COPY package.json package-lock.json turbo.json ./
@@ -10,21 +14,23 @@ COPY services ./services
 COPY apps ./apps
 
 RUN npm ci
-RUN npx turbo run build --filter="...@shifty/api-gateway"
+
+RUN npx turbo run build --filter="...${PACKAGE_NAME}"
 
 FROM node:${NODE_VERSION}-alpine AS runner
+ARG SERVICE_PATH
+ARG PACKAGE_NAME
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-COPY apps/api-gateway/package.json ./apps/api-gateway/
-
 COPY --from=builder /workspace/node_modules ./node_modules
 COPY --from=builder /workspace/packages ./packages
-COPY --from=builder /workspace/apps/api-gateway/dist ./apps/api-gateway/dist
+COPY --from=builder /workspace/services ./services
+COPY --from=builder /workspace/apps ./apps
 
-RUN npm prune --omit=dev --workspaces --include-workspace-root=false && npm cache clean --force
+RUN npm prune --omit=dev --workspace="${PACKAGE_NAME}" --include-workspace-root=false && npm cache clean --force
 
-WORKDIR /app/apps/api-gateway
+WORKDIR /app/$SERVICE_PATH
 
 ENV NODE_ENV=production
 EXPOSE 3000

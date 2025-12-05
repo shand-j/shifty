@@ -16,7 +16,10 @@
     "services/gpu-provisioner",
     "services/model-registry",
     "services/data-lifecycle",
-    "services/hitl-arcade"
+    "services/hitl-arcade",
+    "services/cicd-governor",
+    "services/production-feedback",
+    "services/integrations"
   ],
   "scripts": {
     "dev": "turbo run dev",

@@ -449,3 +449,337 @@ psql -d shifty_platform -f infrastructure/docker/enterprise-migration.sql
      -H "Content-Type: application/json" \
      -d '{"tenantId": "uuid", "name": "CodeLlama", "source": "huggingface", "sourceId": "codellama/CodeLlama-7b-Instruct-hf"}'
    ```
+
+---
+
+### 5. CI/CD Governor Service (Port 3010)
+
+Policy-driven CI/CD governance with automated quality gates and rollback capabilities.
+
+#### Key Features
+- **Release Policies**: Define rules for latency, error rates, coverage thresholds
+- **Policy DSL**: Declarative policy definitions with multiple rule types
+- **Automatic Rollback**: Auto-rollback on policy violations
+- **Release Gates**: Manual approval gates for production deployments
+- **Notifications**: Webhook, Slack, and email notifications on violations
+
+#### Policy Rule Types
+
+| Type | Metrics | Example |
+|------|---------|---------|
+| `latency` | p50, p95, p99 latency | `p99_latency_ms < 200` |
+| `error_rate` | Error percentage | `error_rate_percent < 0.1` |
+| `coverage` | Test coverage | `line_coverage >= 80` |
+| `test_pass_rate` | Test success rate | `test_pass_rate >= 99` |
+| `security_scan` | Vulnerability score | `vuln_score < 5` |
+| `performance` | Various performance metrics | `memory_mb < 512` |
+
+#### API Endpoints
+
+```bash
+# Create release policy
+POST /api/v1/tenants/:tenantId/policies
+{
+  "name": "Production Release Policy",
+  "rules": [
+    {
+      "name": "Latency Gate",
+      "type": "latency",
+      "metric": "p99_latency_ms",
+      "operator": "lt",
+      "threshold": 200,
+      "severity": "blocker"
+    },
+    {
+      "name": "Error Rate Gate",
+      "type": "error_rate",
+      "metric": "error_rate_percent",
+      "operator": "lt",
+      "threshold": 0.1,
+      "severity": "blocker"
+    }
+  ],
+  "rollbackOnFailure": true,
+  "notifyOnViolation": true,
+  "notificationChannels": ["slack", "email"]
+}
+
+# Evaluate policy against metrics
+POST /api/v1/evaluate
+{
+  "tenantId": "uuid",
+  "policyId": "uuid",
+  "pipelineId": "pipeline-123",
+  "commitSha": "abc123",
+  "branch": "main",
+  "metrics": {
+    "p99_latency_ms": 150,
+    "error_rate_percent": 0.05,
+    "line_coverage": 85
+  }
+}
+
+# Create deployment
+POST /api/v1/tenants/:tenantId/deployments
+{
+  "target": "production",
+  "version": "1.2.3",
+  "commitSha": "abc123",
+  "branch": "main",
+  "createdBy": "user-uuid"
+}
+
+# Initiate rollback
+POST /api/v1/rollback
+{
+  "deploymentId": "uuid",
+  "targetVersion": "1.2.2",
+  "reason": "High error rate detected",
+  "requestedBy": "user-uuid"
+}
+
+# Create release gate
+POST /api/v1/tenants/:tenantId/gates
+{
+  "pipelineId": "uuid",
+  "stage": "production",
+  "approvers": ["user-uuid-1", "user-uuid-2"],
+  "expiresInMinutes": 1440
+}
+
+# Approve release gate
+POST /api/v1/gates/:gateId/approve
+{
+  "approvedBy": "user-uuid"
+}
+```
+
+---
+
+### 6. Production Feedback Service (Port 3011)
+
+Automated error clustering, impact analysis, and regression test generation from production incidents.
+
+#### Key Features
+- **Error Ingestion**: Ingest errors from Sentry, Datadog, New Relic, or custom webhooks
+- **Error Clustering**: Automatically group similar errors using fingerprinting
+- **Regression Test Generation**: Auto-generate tests from error patterns
+- **Impact Analysis**: Assess business impact of error clusters
+- **Feedback Loop Rules**: Automated actions on error patterns
+
+#### Feedback Loop Actions
+
+| Action | Description |
+|--------|-------------|
+| `create_jira_ticket` | Auto-create Jira ticket for error cluster |
+| `generate_regression_test` | Generate test to catch the error |
+| `update_pipeline_policy` | Update CI/CD policy with new checks |
+| `notify_team` | Send notifications via configured channels |
+| `trigger_investigation` | Create investigation task |
+| `auto_rollback` | Trigger automatic rollback |
+
+#### API Endpoints
+
+```bash
+# Ingest error event
+POST /api/v1/errors
+{
+  "tenantId": "uuid",
+  "source": "sentry",
+  "externalId": "sentry-event-123",
+  "errorType": "NullPointerException",
+  "message": "Cannot read property 'id' of undefined",
+  "stackTrace": "...",
+  "severity": "high",
+  "environment": "production",
+  "service": "api-gateway"
+}
+
+# Sentry webhook endpoint
+POST /api/v1/webhooks/sentry
+# Headers: X-Tenant-Id: uuid
+# Body: Sentry event payload
+
+# Get error clusters
+GET /api/v1/tenants/:tenantId/clusters?status=new&severity=high
+
+# Generate regression test
+POST /api/v1/regression-tests
+{
+  "tenantId": "uuid",
+  "errorClusterId": "uuid",
+  "framework": "playwright"
+}
+
+# Create feedback loop rule
+POST /api/v1/tenants/:tenantId/feedback-rules
+{
+  "name": "Critical Error Handler",
+  "trigger": {
+    "errorSeverity": ["critical", "high"],
+    "errorCountThreshold": 10
+  },
+  "actions": ["create_jira_ticket", "generate_regression_test", "notify_team"],
+  "enabled": true
+}
+
+# Analyze impact of error cluster
+POST /api/v1/clusters/:clusterId/analyze
+# Returns: Impact score, business impact, recommendations
+```
+
+---
+
+### 7. Integrations Service (Port 3012)
+
+Connect Shifty to external tools and services for seamless workflow integration.
+
+#### Supported Integrations
+
+| Integration | Type | Features |
+|-------------|------|----------|
+| GitHub | Source Control | Webhooks, PR integration, workflow triggers |
+| GitLab | Source Control | Webhooks, MR integration |
+| Jenkins | CI/CD | Build triggers, status updates |
+| GitHub Actions | CI/CD | Workflow integration |
+| Sentry | Monitoring | Error ingestion, issue linking |
+| Datadog | Monitoring | Metrics, error forwarding |
+| New Relic | Monitoring | APM integration |
+| Jira | Issue Tracking | Auto-ticket creation, updates |
+| Slack | Notifications | Alerts, status updates, mentions |
+| PagerDuty | Alerting | Critical incident alerts |
+
+#### API Endpoints
+
+```bash
+# Create integration
+POST /api/v1/tenants/:tenantId/integrations
+{
+  "type": "github",
+  "name": "My GitHub",
+  "config": {
+    "accessToken": "ghp_xxx",
+    "organization": "my-org",
+    "repositories": ["repo1", "repo2"],
+    "enableWebhooks": true
+  }
+}
+
+# Get tenant integrations
+GET /api/v1/tenants/:tenantId/integrations
+
+# Create GitHub webhook
+POST /api/v1/integrations/:integrationId/github/webhooks
+{
+  "repoOwner": "my-org",
+  "repoName": "my-repo",
+  "events": ["push", "pull_request", "workflow_run"]
+}
+
+# Create Jira ticket (via integration)
+POST /api/v1/jira/tickets
+{
+  "tenantId": "uuid",
+  "summary": "Bug: Login fails for SSO users",
+  "description": "Users cannot login...",
+  "priority": "High",
+  "labels": ["bug", "sso"]
+}
+
+# Send Slack message
+POST /api/v1/integrations/:integrationId/slack/message
+{
+  "channel": "#alerts",
+  "message": "Deployment completed!"
+}
+
+# Send notification across all channels
+POST /api/v1/notifications
+{
+  "tenantId": "uuid",
+  "type": "error_alert",
+  "data": {
+    "errorType": "DatabaseConnectionError",
+    "service": "api-gateway",
+    "severity": "critical"
+  }
+}
+```
+
+#### Integration Configuration Examples
+
+**Jira Integration**
+```json
+{
+  "type": "jira",
+  "name": "Company Jira",
+  "config": {
+    "baseUrl": "https://company.atlassian.net",
+    "email": "bot@company.com",
+    "apiToken": "xxx",
+    "projectKey": "SHIFT",
+    "defaultIssueType": "Bug",
+    "autoCreateTickets": true,
+    "autoCreateConfig": {
+      "minSeverity": "high",
+      "labels": ["shifty-auto"]
+    }
+  }
+}
+```
+
+**Slack Integration**
+```json
+{
+  "type": "slack",
+  "name": "Engineering Slack",
+  "config": {
+    "botToken": "xoxb-xxx",
+    "defaultChannel": "#eng-alerts",
+    "notificationChannels": [
+      {
+        "channelId": "C123",
+        "channelName": "#critical-alerts",
+        "notifyOn": ["error_critical", "deployment_failed"]
+      }
+    ],
+    "mentionOnCritical": ["U123", "U456"]
+  }
+}
+```
+
+---
+
+## Complete Service Architecture
+
+| Service | Port | Description |
+|---------|------|-------------|
+| API Gateway | 3000 | Main entry point |
+| Tenant Manager | 3001 | Tenant provisioning |
+| Auth Service | 3002 | Authentication |
+| AI Orchestrator | 3003 | AI workflow orchestration |
+| Test Generator | 3004 | Test generation |
+| Healing Engine | 3005 | Self-healing tests |
+| GPU Provisioner | 3006 | Vast.ai GPU management |
+| Model Registry | 3007 | Model lifecycle |
+| Data Lifecycle | 3008 | Data governance |
+| HITL Arcade | 3009 | Gamified validation |
+| CI/CD Governor | 3010 | Release policies |
+| Production Feedback | 3011 | Error → Test loop |
+| Integrations | 3012 | External connectors |
+
+## End-to-End Flow Example
+
+### Production Error → Regression Test → Pipeline Update
+
+1. **Error Occurs**: Production error captured by Sentry
+2. **Ingestion**: Production Feedback service receives webhook
+3. **Clustering**: Similar errors grouped into cluster
+4. **Analysis**: Impact analysis determines severity
+5. **Auto-Actions** (via Feedback Loop Rules):
+   - Create Jira ticket
+   - Generate regression test using tenant's model
+   - Notify team via Slack
+6. **Test Review**: HITL Arcade mission for test validation
+7. **Pipeline Update**: CI/CD Governor adds new test coverage requirement
+8. **Deployment**: Future deployments must pass regression test

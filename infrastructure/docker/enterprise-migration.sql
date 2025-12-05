@@ -331,3 +331,283 @@ COMMENT ON TABLE arcade_profiles IS 'Gamified user profiles for HITL validation'
 COMMENT ON TABLE arcade_missions IS 'Missions/tasks for human validators';
 COMMENT ON TABLE mission_feedback IS 'User feedback that feeds into training datasets';
 COMMENT ON TABLE hitl_datasets IS 'Curated datasets from HITL feedback';
+
+-- ==================== CI/CD Governor Tables ====================
+
+CREATE TABLE IF NOT EXISTS release_policies (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  rules JSONB NOT NULL,
+  rollback_on_failure BOOLEAN DEFAULT TRUE,
+  notify_on_violation BOOLEAN DEFAULT TRUE,
+  notification_channels JSONB DEFAULT '[]',
+  webhook_urls JSONB DEFAULT '[]',
+  enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_policies_tenant_id ON release_policies(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_release_policies_enabled ON release_policies(enabled);
+
+CREATE TABLE IF NOT EXISTS policy_evaluations (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  policy_id UUID REFERENCES release_policies(id) ON DELETE CASCADE NOT NULL,
+  pipeline_id VARCHAR(255) NOT NULL,
+  commit_sha VARCHAR(64) NOT NULL,
+  branch VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  rule_results JSONB NOT NULL,
+  triggered_rollback BOOLEAN DEFAULT FALSE,
+  rollback_details JSONB,
+  started_at TIMESTAMP NOT NULL,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_evaluations_tenant_id ON policy_evaluations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_policy_evaluations_policy_id ON policy_evaluations(policy_id);
+CREATE INDEX IF NOT EXISTS idx_policy_evaluations_status ON policy_evaluations(status);
+
+CREATE TABLE IF NOT EXISTS deployments (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  target VARCHAR(50) NOT NULL, -- development, staging, canary, production
+  version VARCHAR(100) NOT NULL,
+  commit_sha VARCHAR(64) NOT NULL,
+  branch VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  policy_evaluation_id UUID REFERENCES policy_evaluations(id) ON DELETE SET NULL,
+  metrics JSONB,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_deployments_tenant_id ON deployments(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_target ON deployments(target);
+CREATE INDEX IF NOT EXISTS idx_deployments_status ON deployments(status);
+
+CREATE TABLE IF NOT EXISTS release_gates (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  pipeline_id UUID NOT NULL,
+  stage VARCHAR(50) NOT NULL,
+  status VARCHAR(50) DEFAULT 'open',
+  approval_required BOOLEAN DEFAULT TRUE,
+  approvers JSONB NOT NULL,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  rejected_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  expires_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_gates_tenant_id ON release_gates(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_release_gates_status ON release_gates(status);
+
+-- ==================== Production Feedback Tables ====================
+
+CREATE TABLE IF NOT EXISTS error_events (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  source VARCHAR(50) NOT NULL, -- sentry, datadog, new_relic, application_logs, custom_webhook
+  external_id VARCHAR(255) NOT NULL,
+  error_type VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  stack_trace TEXT,
+  severity VARCHAR(50) NOT NULL,
+  environment VARCHAR(100) NOT NULL,
+  service VARCHAR(255) NOT NULL,
+  endpoint TEXT,
+  user_id VARCHAR(255),
+  metadata JSONB DEFAULT '{}',
+  first_seen TIMESTAMP NOT NULL,
+  last_seen TIMESTAMP NOT NULL,
+  occurrence_count INTEGER DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_error_events_tenant_id ON error_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_error_events_source ON error_events(source);
+CREATE INDEX IF NOT EXISTS idx_error_events_severity ON error_events(severity);
+CREATE INDEX IF NOT EXISTS idx_error_events_service ON error_events(service);
+
+CREATE TABLE IF NOT EXISTS error_clusters (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  fingerprint VARCHAR(64) NOT NULL,
+  error_type VARCHAR(255) NOT NULL,
+  primary_message TEXT NOT NULL,
+  severity VARCHAR(50) NOT NULL,
+  status VARCHAR(50) DEFAULT 'new',
+  affected_services JSONB DEFAULT '[]',
+  affected_endpoints JSONB DEFAULT '[]',
+  error_count INTEGER DEFAULT 0,
+  impacted_users INTEGER,
+  first_occurrence TIMESTAMP NOT NULL,
+  last_occurrence TIMESTAMP NOT NULL,
+  resolved_at TIMESTAMP,
+  assigned_to UUID REFERENCES users(id) ON DELETE SET NULL,
+  regression_test_id UUID,
+  jira_ticket_id VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_error_clusters_tenant_id ON error_clusters(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_error_clusters_fingerprint ON error_clusters(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_error_clusters_status ON error_clusters(status);
+CREATE INDEX IF NOT EXISTS idx_error_clusters_severity ON error_clusters(severity);
+
+CREATE TABLE IF NOT EXISTS regression_tests (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  error_cluster_id UUID REFERENCES error_clusters(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  framework VARCHAR(50) NOT NULL,
+  test_code TEXT NOT NULL,
+  scenarios JSONB DEFAULT '[]',
+  status VARCHAR(50) DEFAULT 'draft',
+  validation_result JSONB,
+  approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  deployed_to_pipeline BOOLEAN DEFAULT FALSE,
+  pipeline_id UUID,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_regression_tests_tenant_id ON regression_tests(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_regression_tests_cluster_id ON regression_tests(error_cluster_id);
+CREATE INDEX IF NOT EXISTS idx_regression_tests_status ON regression_tests(status);
+
+-- Add foreign key for regression_test_id in error_clusters
+ALTER TABLE error_clusters 
+  ADD CONSTRAINT fk_error_clusters_regression_test 
+  FOREIGN KEY (regression_test_id) REFERENCES regression_tests(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS feedback_loop_rules (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  trigger JSONB NOT NULL,
+  actions JSONB NOT NULL,
+  action_config JSONB DEFAULT '{}',
+  enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_loop_rules_tenant_id ON feedback_loop_rules(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_loop_rules_enabled ON feedback_loop_rules(enabled);
+
+CREATE TABLE IF NOT EXISTS feedback_loop_executions (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  rule_id UUID REFERENCES feedback_loop_rules(id) ON DELETE CASCADE NOT NULL,
+  error_cluster_id UUID REFERENCES error_clusters(id) ON DELETE CASCADE NOT NULL,
+  triggered_actions JSONB NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_loop_executions_tenant_id ON feedback_loop_executions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_loop_executions_rule_id ON feedback_loop_executions(rule_id);
+
+CREATE TABLE IF NOT EXISTS impact_analyses (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  error_cluster_id UUID REFERENCES error_clusters(id) ON DELETE CASCADE NOT NULL,
+  impact_score INTEGER NOT NULL,
+  business_impact VARCHAR(50) NOT NULL,
+  estimated_users_affected INTEGER,
+  estimated_revenue_impact DECIMAL(12,2),
+  affected_features JSONB DEFAULT '[]',
+  recommendations JSONB DEFAULT '[]',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_impact_analyses_tenant_id ON impact_analyses(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_impact_analyses_cluster_id ON impact_analyses(error_cluster_id);
+
+-- ==================== Integrations Tables ====================
+
+CREATE TABLE IF NOT EXISTS integrations (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  type VARCHAR(50) NOT NULL, -- github, gitlab, jenkins, sentry, datadog, jira, slack, etc.
+  name VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending_setup',
+  enabled BOOLEAN DEFAULT TRUE,
+  config JSONB NOT NULL,
+  webhook_url TEXT,
+  webhook_secret TEXT,
+  last_sync_at TIMESTAMP,
+  last_error TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_integrations_tenant_id ON integrations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_integrations_type ON integrations(type);
+CREATE INDEX IF NOT EXISTS idx_integrations_status ON integrations(status);
+
+CREATE TABLE IF NOT EXISTS integration_events (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  integration_id UUID REFERENCES integrations(id) ON DELETE CASCADE NOT NULL,
+  type VARCHAR(100) NOT NULL,
+  source VARCHAR(50) NOT NULL,
+  payload JSONB NOT NULL,
+  processed BOOLEAN DEFAULT FALSE,
+  processed_at TIMESTAMP,
+  error TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_integration_events_tenant_id ON integration_events(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_integration_events_integration_id ON integration_events(integration_id);
+CREATE INDEX IF NOT EXISTS idx_integration_events_processed ON integration_events(processed);
+
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE NOT NULL,
+  integration_id UUID REFERENCES integrations(id) ON DELETE CASCADE NOT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  payload JSONB NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 3,
+  last_attempt_at TIMESTAMP,
+  delivered_at TIMESTAMP,
+  response_code INTEGER,
+  error TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_tenant_id ON webhook_deliveries(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);
+
+-- ==================== Additional Comments ====================
+
+COMMENT ON TABLE release_policies IS 'CI/CD release policies with rules for latency, error rate, coverage gates';
+COMMENT ON TABLE policy_evaluations IS 'Results of policy evaluations against deployments';
+COMMENT ON TABLE deployments IS 'Deployment records with policy enforcement';
+COMMENT ON TABLE release_gates IS 'Manual approval gates for release pipeline stages';
+COMMENT ON TABLE error_events IS 'Raw error events ingested from monitoring systems';
+COMMENT ON TABLE error_clusters IS 'Clustered/grouped similar errors for analysis';
+COMMENT ON TABLE regression_tests IS 'Auto-generated regression tests from error clusters';
+COMMENT ON TABLE feedback_loop_rules IS 'Automation rules for the production feedback loop';
+COMMENT ON TABLE feedback_loop_executions IS 'Execution history of feedback loop automations';
+COMMENT ON TABLE impact_analyses IS 'Business impact analysis of error clusters';
+COMMENT ON TABLE integrations IS 'Third-party integration configurations (GitHub, Jira, Slack, etc.)';
+COMMENT ON TABLE integration_events IS 'Events received from integrations';
+COMMENT ON TABLE webhook_deliveries IS 'Outbound webhook delivery tracking';

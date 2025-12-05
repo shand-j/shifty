@@ -333,6 +333,63 @@ volumes:
     networks:
       - shifty-network
 
+  # CI/CD Governor Service
+  cicd-governor:
+    build:
+      context: .
+      dockerfile: services/cicd-governor/Dockerfile
+    container_name: shifty-cicd-governor
+    ports:
+      - "3010:3010"
+    environment:
+      - NODE_ENV=development
+      - PORT=3010
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - INTEGRATIONS_URL=http://integrations:3012
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
+  # Production Feedback Service
+  production-feedback:
+    build:
+      context: .
+      dockerfile: services/production-feedback/Dockerfile
+    container_name: shifty-production-feedback
+    ports:
+      - "3011:3011"
+    environment:
+      - NODE_ENV=development
+      - PORT=3011
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - TEST_GENERATOR_URL=http://test-generator:3004
+      - INTEGRATIONS_URL=http://integrations:3012
+    depends_on:
+      - platform-db
+      - test-generator
+    networks:
+      - shifty-network
+
+  # Integrations Service
+  integrations:
+    build:
+      context: .
+      dockerfile: services/integrations/Dockerfile
+    container_name: shifty-integrations
+    ports:
+      - "3012:3012"
+    environment:
+      - NODE_ENV=development
+      - PORT=3012
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - PRODUCTION_FEEDBACK_URL=http://production-feedback:3011
+      - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-http://localhost:3012}
+    depends_on:
+      - platform-db
+    networks:
+      - shifty-network
+
 networks:
   shifty-network:
     driver: bridge

@@ -1,0 +1,213 @@
+# Shifty Security Scan GitHub Action
+#
+# This workflow runs security scans using Shifty's security testing service
+# Supports DAST, SAST, SCA, and secret scanning
+#
+# Usage:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Configure scan types and thresholds
+
+name: Shifty Security Scan
+
+on:
+  # Run on pushes to main
+  push:
+    branches: [main, master]
+  
+  # Run on PRs
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+  # Run on schedule (weekly)
+  schedule:
+    - cron: '0 3 * * 1'  # 3 AM UTC every Monday
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Scan type to run'
+        required: false
+        type: choice
+        options:
+          - all
+          - dast
+          - sast
+          - sca
+          - secret
+        default: all
+      fail_on_high:
+        description: 'Fail if high severity issues found'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run SAST Scan
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'sast' || github.event_name != 'workflow_dispatch'
+        id: sast
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/security/scans" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{
+              \"configId\": \"sast-default\",
+              \"target\": {
+                \"repository\": \"${{ github.repository }}\",
+                \"branch\": \"${{ github.head_ref || github.ref_name }}\",
+                \"commitSha\": \"${{ github.sha }}\"
+              },
+              \"scanType\": \"sast\"
+            }")
+          
+          echo "SAST Response: $RESPONSE"
+          SCAN_ID=$(echo $RESPONSE | jq -r '.data.id // empty')
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+      - name: Run SCA Scan
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'sca' || github.event_name != 'workflow_dispatch'
+        id: sca
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/security/scans" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{
+              \"configId\": \"sca-default\",
+              \"target\": {
+                \"repository\": \"${{ github.repository }}\"
+              },
+              \"scanType\": \"sca\"
+            }")
+          
+          echo "SCA Response: $RESPONSE"
+          SCAN_ID=$(echo $RESPONSE | jq -r '.data.id // empty')
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+      - name: Run Secret Scan
+        if: inputs.scan_type == 'all' || inputs.scan_type == 'secret' || github.event_name != 'workflow_dispatch'
+        id: secret
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/security/scans" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{
+              \"configId\": \"secret-default\",
+              \"target\": {
+                \"repository\": \"${{ github.repository }}\"
+              },
+              \"scanType\": \"secret\"
+            }")
+          
+          echo "Secret Scan Response: $RESPONSE"
+          SCAN_ID=$(echo $RESPONSE | jq -r '.data.id // empty')
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Scans to Complete
+        run: |
+          echo "Waiting for security scans to complete..."
+          sleep 30  # Allow time for scans to process
+
+      - name: Get Security Summary
+        id: summary
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          RESPONSE=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/security/summary?tenantId=${SHIFTY_TENANT_ID:-default}" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}")
+          
+          echo "$RESPONSE" > security-summary.json
+          
+          CRITICAL=$(echo $RESPONSE | jq -r '.data.bySeverity.critical // 0')
+          HIGH=$(echo $RESPONSE | jq -r '.data.bySeverity.high // 0')
+          MEDIUM=$(echo $RESPONSE | jq -r '.data.bySeverity.medium // 0')
+          
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = {};
+            try {
+              summary = JSON.parse(fs.readFileSync('security-summary.json', 'utf8'));
+            } catch (e) {
+              summary = { data: { bySeverity: {} } };
+            }
+            
+            const sev = summary.data?.bySeverity || {};
+            const hasIssues = (sev.critical || 0) + (sev.high || 0) > 0;
+            const statusEmoji = hasIssues ? '⚠️' : '✅';
+            
+            const body = `## ${statusEmoji} Shifty Security Scan Results
+            
+            | Severity | Count |
+            |----------|-------|
+            | 🔴 Critical | ${sev.critical || 0} |
+            | 🟠 High | ${sev.high || 0} |
+            | 🟡 Medium | ${sev.medium || 0} |
+            | 🔵 Low | ${sev.low || 0} |
+            
+            ${hasIssues ? '**Action Required:** Please review and address security issues before merging.' : '**No critical or high severity issues found!**'}
+            
+            ---
+            *Powered by [Shifty Security](https://shifty.ai)*
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Check Thresholds
+        if: inputs.fail_on_high == true || github.event_name == 'pull_request'
+        run: |
+          CRITICAL="${{ steps.summary.outputs.critical }}"
+          HIGH="${{ steps.summary.outputs.high }}"
+          
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Critical security vulnerabilities found!"
+            exit 1
+          fi
+          
+          if [ "${{ inputs.fail_on_high }}" = "true" ] && [ "$HIGH" -gt 0 ]; then
+            echo "❌ High severity security vulnerabilities found!"
+            exit 1
+          fi
+          
+          echo "✅ Security scan passed!"

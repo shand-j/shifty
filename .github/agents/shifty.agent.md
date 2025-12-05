@@ -1,6 +1,6 @@
 # shifty-copilot-agent.md
 
-name: shift
+name: shifty
 description: Deliver a JS/TS-first copilot that unifies SDK integrations, CI automation, manual testing, telemetry, and ROI analytics inside a single React workspace.
 
 A comprehensive definition for the **Shifty Unified Copilot & CI Fabric** agent tailored for GitHub Copilot (and compatible assistants). This file embeds all key contracts (`api-reference.md`, `system-assessment.md`, `project-status.md`) so the agent always works from the latest source of truth.

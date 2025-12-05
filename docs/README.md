@@ -43,6 +43,7 @@ This directory contains all project documentation organized for developers, test
 
 ### 📋 Project Management
 
+- **[System Assessment](./project-management/system-assessment.md)** - Comprehensive system analysis (strengths, gaps, CI/CD, security)
 - **[Tech Debt Backlog](./project-management/tech-debt-backlog.md)** - Technical debt tracking
 - **[Feature Roadmap](./project-management/roadmap.md)** - Project roadmap and milestones
 - **[Project Status](./project-management/project-status.md)** - Current project status

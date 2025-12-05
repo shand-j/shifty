@@ -5,6 +5,17 @@ import rateLimit from '@fastify/rate-limit';
 import proxy from '@fastify/http-proxy';
 import jwt from '@fastify/jwt';
 import { createClient } from 'redis';
+import { getJwtConfig, validateProductionConfig } from '@shifty/shared';
+
+// Validate configuration on startup
+try {
+  validateProductionConfig();
+} catch (error) {
+  console.error('Configuration validation failed:', error);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
 
 // HIGH: No request body size limits - DoS vulnerability
 // FIXME: Allows attackers to send huge payloads, exhausting memory
@@ -144,17 +155,11 @@ class APIGateway {
       // redis: this.redis  // Commented out due to compatibility issues
     });
 
-    // CRITICAL: Hardcoded JWT secret - SECURITY VULNERABILITY
-    // FIXME: All tokens can be forged if deployed without changing this
-    // TODO: Implement secure JWT secret handling:
-    //   1. Generate strong secret: openssl rand -base64 64
-    //   2. Store in AWS Secrets Manager or environment
-    //   3. Add startup validation: if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-in-production')) { throw new Error('JWT_SECRET must be set in production'); }
-    //   4. Never commit real secrets to git
-    // Impact: Complete authentication bypass, privilege escalation
-    // Effort: 30 minutes | Priority: CRITICAL
+    // JWT configuration using centralized config module
+    // Production validation is handled at startup via validateProductionConfig()
+    const jwtConfig = getJwtConfig();
     await fastify.register(jwt, {
-      secret: process.env.JWT_SECRET || 'dev-secret-change-in-production'
+      secret: jwtConfig.secret
     });
   }
 

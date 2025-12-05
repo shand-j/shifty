@@ -97,7 +97,12 @@ class HealingEngineService {
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       model: process.env.AI_MODEL || 'llama3.1'
     });
-    // Template for tenant database URLs - use env var or default pattern
+    
+    // Template for tenant database URLs
+    // In production, TENANT_DB_URL_TEMPLATE must be configured
+    if (process.env.NODE_ENV === 'production' && !process.env.TENANT_DB_URL_TEMPLATE) {
+      console.warn('⚠️ WARNING: TENANT_DB_URL_TEMPLATE not configured in production');
+    }
     this.tenantDbUrlTemplate = process.env.TENANT_DB_URL_TEMPLATE || 
       process.env.DATABASE_URL || 
       'postgresql://localhost:5432/shifty_tenant_{tenantId}';

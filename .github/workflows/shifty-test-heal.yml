@@ -127,11 +127,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate Tenant Configuration
+        run: |
+          if [ -z "${{ secrets.SHIFTY_TENANT_ID }}" ]; then
+            echo "::error::SHIFTY_TENANT_ID secret is not configured. Please set up the tenant ID in repository secrets."
+            exit 1
+          fi
+
       - name: Call Shifty Healing API
         id: heal
         env:
           SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
-          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID || github.repository_owner }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
         run: |
           SELECTOR="${{ github.event.inputs.selector }}"
           PAGE_URL="${{ github.event.inputs.page_url }}"

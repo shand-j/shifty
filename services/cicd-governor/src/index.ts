@@ -362,6 +362,31 @@ class CICDGovernorApp {
     });
 
     // Quality Insights Action Endpoint
+    // Quality scoring configuration
+    // These weights and thresholds can be tuned based on team preferences
+    const QUALITY_CONFIG = {
+      // Test coverage calculation: testCount * multiplier, capped at 100%
+      // Higher multiplier = fewer tests needed for good coverage score
+      testCoverageMultiplier: 2,
+      
+      // Change risk calculation: changedFiles * multiplier, capped at 100%
+      // Higher multiplier = more risk per file changed
+      changeRiskMultiplier: 5,
+      
+      // Quality score weights (must sum to 1.0)
+      weights: {
+        testCoverage: 0.5,    // 50% weight on test coverage
+        changeRisk: 0.3,      // 30% weight on change risk (inverted)
+        baseScore: 0.2        // 20% base score for having tests at all
+      },
+      
+      // Gate thresholds
+      thresholds: {
+        passed: 70,   // Score >= 70 = passed
+        warning: 50   // Score >= 50 = warning, < 50 = failed
+      }
+    };
+
     fastify.post('/api/v1/ci/actions/quality-insights', async (request, reply) => {
       try {
         const body = request.body as {
@@ -373,30 +398,34 @@ class CICDGovernorApp {
           changedFiles?: number;
         };
 
-        // Calculate quality metrics
-        const testCoverage = body.testCount ? Math.min(100, body.testCount * 2) : 0;
-        const changeRisk = body.changedFiles ? Math.min(100, body.changedFiles * 5) : 0;
+        // Calculate quality metrics using configurable weights
+        const testCoverage = body.testCount 
+          ? Math.min(100, body.testCount * QUALITY_CONFIG.testCoverageMultiplier) 
+          : 0;
+        const changeRisk = body.changedFiles 
+          ? Math.min(100, body.changedFiles * QUALITY_CONFIG.changeRiskMultiplier) 
+          : 0;
         
-        // Calculate quality score (simplified algorithm)
+        // Calculate quality score using weighted average
         const qualityScore = Math.round(
-          (testCoverage * 0.5) + 
-          ((100 - changeRisk) * 0.3) + 
-          (50 * 0.2) // Base score
+          (testCoverage * QUALITY_CONFIG.weights.testCoverage) + 
+          ((100 - changeRisk) * QUALITY_CONFIG.weights.changeRisk) + 
+          (50 * QUALITY_CONFIG.weights.baseScore)
         );
 
-        // Determine gate status
-        const gateStatus = qualityScore >= 70 ? 'passed' : 
-                          qualityScore >= 50 ? 'warning' : 'failed';
+        // Determine gate status based on thresholds
+        const gateStatus = qualityScore >= QUALITY_CONFIG.thresholds.passed ? 'passed' : 
+                          qualityScore >= QUALITY_CONFIG.thresholds.warning ? 'warning' : 'failed';
 
         // Generate recommendations
         const recommendations: string[] = [];
-        if (testCoverage < 70) {
+        if (testCoverage < QUALITY_CONFIG.thresholds.passed) {
           recommendations.push('Consider adding more tests to improve coverage');
         }
-        if (changeRisk > 50) {
+        if (changeRisk > QUALITY_CONFIG.thresholds.warning) {
           recommendations.push('Large number of changed files - consider splitting into smaller PRs');
         }
-        if (qualityScore < 70) {
+        if (qualityScore < QUALITY_CONFIG.thresholds.passed) {
           recommendations.push('Run additional test suites before merging');
         }
 

@@ -1,0 +1,228 @@
+# Shifty Performance Test GitHub Action
+#
+# This workflow runs performance tests using Shifty's performance testing service
+# Supports load, stress, soak, and spike testing
+#
+# Usage:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Configure target URL and test parameters
+
+name: Shifty Performance Test
+
+on:
+  # Run on deployment to staging/production
+  deployment_status:
+
+  # Run on schedule (weekly)
+  schedule:
+    - cron: '0 5 * * 1'  # 5 AM UTC every Monday
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL for performance testing'
+        required: true
+        type: string
+      test_type:
+        description: 'Type of performance test'
+        required: false
+        type: choice
+        options:
+          - load
+          - stress
+          - soak
+          - spike
+          - baseline
+        default: load
+      virtual_users:
+        description: 'Number of virtual users'
+        required: false
+        type: number
+        default: 50
+      duration_seconds:
+        description: 'Test duration in seconds'
+        required: false
+        type: number
+        default: 120
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    # Only run on successful deployments or manual trigger
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
+    
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Target URL
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            URL="${{ inputs.target_url }}"
+          elif [ "${{ github.event_name }}" = "deployment_status" ]; then
+            URL="${{ github.event.deployment_status.target_url }}"
+          else
+            URL="${{ vars.STAGING_URL || 'https://staging.example.com' }}"
+          fi
+          
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Create Performance Test Config
+        id: config
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          TEST_TYPE="${{ inputs.test_type || 'load' }}"
+          VIRTUAL_USERS="${{ inputs.virtual_users || '50' }}"
+          DURATION="${{ inputs.duration_seconds || '120' }}"
+          TARGET="${{ steps.target.outputs.url }}"
+          
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/performance/configs" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{
+              \"tenantId\": \"${SHIFTY_TENANT_ID:-default}\",
+              \"name\": \"CI Performance Test - $TEST_TYPE\",
+              \"testType\": \"$TEST_TYPE\",
+              \"targetUrl\": \"$TARGET\",
+              \"virtualUsers\": $VIRTUAL_USERS,
+              \"rampUpSeconds\": 30,
+              \"durationSeconds\": $DURATION,
+              \"thresholds\": {
+                \"maxResponseTimeMs\": 5000,
+                \"maxP95ResponseTimeMs\": 3000,
+                \"maxP99ResponseTimeMs\": 4000,
+                \"maxErrorRate\": 5,
+                \"minThroughputRps\": 10
+              },
+              \"scenarios\": [
+                {
+                  \"name\": \"Main Flow\",
+                  \"weight\": 100,
+                  \"steps\": [
+                    {\"method\": \"GET\", \"path\": \"/\"},
+                    {\"method\": \"GET\", \"path\": \"/api/health\"}
+                  ]
+                }
+              ]
+            }")
+          
+          echo "Config Response: $RESPONSE"
+          CONFIG_ID=$(echo $RESPONSE | jq -r '.data.id // empty')
+          
+          if [ -z "$CONFIG_ID" ]; then
+            echo "Failed to create test config"
+            exit 1
+          fi
+          
+          echo "config_id=$CONFIG_ID" >> $GITHUB_OUTPUT
+
+      - name: Start Performance Test
+        id: test
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          CONFIG_ID="${{ steps.config.outputs.config_id }}"
+          
+          RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/performance/runs" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{\"configId\": \"$CONFIG_ID\"}")
+          
+          RUN_ID=$(echo $RESPONSE | jq -r '.data.id // empty')
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Test to Complete
+        run: |
+          DURATION="${{ inputs.duration_seconds || '120' }}"
+          WAIT_TIME=$((DURATION + 60))  # Add buffer
+          echo "Waiting ${WAIT_TIME}s for performance test to complete..."
+          sleep $WAIT_TIME
+
+      - name: Get Test Results
+        id: results
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          RUN_ID="${{ steps.test.outputs.run_id }}"
+          
+          RESPONSE=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/performance/runs/$RUN_ID" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}")
+          
+          echo "$RESPONSE" > performance-results.json
+          
+          STATUS=$(echo $RESPONSE | jq -r '.data.status // "unknown"')
+          PASSED=$(echo $RESPONSE | jq -r '.data.passed // false')
+          AVG_RESPONSE=$(echo $RESPONSE | jq -r '.data.results.avgResponseTimeMs // 0')
+          P95_RESPONSE=$(echo $RESPONSE | jq -r '.data.results.p95ResponseTimeMs // 0')
+          ERROR_RATE=$(echo $RESPONSE | jq -r '.data.results.errorRate // 0')
+          RPS=$(echo $RESPONSE | jq -r '.data.results.requestsPerSecond // 0')
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "avg_response=$AVG_RESPONSE" >> $GITHUB_OUTPUT
+          echo "p95_response=$P95_RESPONSE" >> $GITHUB_OUTPUT
+          echo "error_rate=$ERROR_RATE" >> $GITHUB_OUTPUT
+          echo "rps=$RPS" >> $GITHUB_OUTPUT
+
+      - name: Generate Performance Report
+        run: |
+          cat << EOF > performance-report.md
+          ## ⚡ Shifty Performance Test Results
+          
+          **Test Type:** ${{ inputs.test_type || 'load' }}
+          **Target URL:** ${{ steps.target.outputs.url }}
+          **Virtual Users:** ${{ inputs.virtual_users || '50' }}
+          **Duration:** ${{ inputs.duration_seconds || '120' }}s
+          
+          ### Results
+          
+          | Metric | Value | Threshold | Status |
+          |--------|-------|-----------|--------|
+          | Avg Response Time | ${{ steps.results.outputs.avg_response }}ms | - | - |
+          | P95 Response Time | ${{ steps.results.outputs.p95_response }}ms | 3000ms | ${{ steps.results.outputs.p95_response < 3000 && '✅' || '❌' }} |
+          | Error Rate | ${{ steps.results.outputs.error_rate }}% | 5% | ${{ steps.results.outputs.error_rate < 5 && '✅' || '❌' }} |
+          | Throughput | ${{ steps.results.outputs.rps }} req/s | 10 req/s | ${{ steps.results.outputs.rps > 10 && '✅' || '❌' }} |
+          
+          ### Overall: ${{ steps.results.outputs.passed == 'true' && '✅ PASSED' || '❌ FAILED' }}
+          
+          ---
+          *Powered by [Shifty Performance](https://shifty.ai)*
+          EOF
+          
+          cat performance-report.md
+
+      - name: Upload Performance Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: |
+            performance-results.json
+            performance-report.md
+
+      - name: Check Thresholds
+        run: |
+          PASSED="${{ steps.results.outputs.passed }}"
+          
+          if [ "$PASSED" != "true" ]; then
+            echo "❌ Performance test failed thresholds!"
+            cat performance-results.json | jq '.data.thresholdResults'
+            exit 1
+          fi
+          
+          echo "✅ Performance test passed!"

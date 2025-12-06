@@ -273,6 +273,41 @@ class APIGateway {
       prefix: '/api/v1/healing',
       target: process.env.HEALING_ENGINE_URL || 'http://localhost:3005',
       requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/roi',
+      target: process.env.ROI_SERVICE_URL || 'http://localhost:3015',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/performance',
+      target: process.env.PERFORMANCE_TESTING_URL || 'http://localhost:3016',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/security',
+      target: process.env.SECURITY_TESTING_URL || 'http://localhost:3017',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/accessibility',
+      target: process.env.ACCESSIBILITY_TESTING_URL || 'http://localhost:3018',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/sessions/manual',
+      target: process.env.MANUAL_SESSION_HUB_URL || 'http://localhost:3019',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/hitl',
+      target: process.env.HITL_ARCADE_URL || 'http://localhost:3011',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/ci',
+      target: process.env.CICD_GOVERNOR_URL || 'http://localhost:3012',
+      requiresAuth: true
     }
   ];
 

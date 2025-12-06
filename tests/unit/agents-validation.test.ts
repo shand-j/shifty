@@ -1,10 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Skip global setup for this test - it's a file validation test
+// Skip global setup for this test - it's a file validation test that doesn't require services
+// The mock path is relative to this test file location: tests/unit/agents-validation.test.ts
+// which needs to mock tests/setup.ts (../../tests/setup from here)
 jest.mock('../../tests/setup', () => ({}));
 
 describe('Custom Agents Validation', () => {
+  // Agent files are in .github/agents relative to repository root
   const agentsDir = path.join(__dirname, '../../.github/agents');
   
   describe('qe-collaborator.agent.md', () => {

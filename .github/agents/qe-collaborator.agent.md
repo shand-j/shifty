@@ -803,10 +803,11 @@ await sdk.event.emit({
 - Record exploratory testing findings
 - Bridge manual and automated testing
 
-**Test Generator** (`ci.actions.test-gen`):
+**Test Generator** (`ci.actions.test-gen`, `services/test-generator`):
 - Request AI test generation
 - Validate generated tests against requirements
 - Provide context for improved generation
+- Supplies test data fixtures and mocks (e.g., `mockPaymentGateway.simulateTimeout()`)
 
 **Healing Engine** (`ci.actions.test-heal`):
 - Review healing suggestions

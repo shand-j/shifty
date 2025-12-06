@@ -74,7 +74,7 @@ test('Has Dev example', agentContent.includes('### 9.4 Dev → QE Collaborator')
 console.log('\nTesting agents/README.md:\n');
 
 test('README exists', fs.existsSync(readmePath));
-test('Documents shifty-dev', readmeContent.includes('shifty-dev'));
+test('Documents shifty-dev', readmeContent.includes('### 1. shifty-dev'));
 test('Documents shifty', readmeContent.includes('### 2. shifty'));
 test('Documents qe-collaborator', readmeContent.includes('### 3. qe-collaborator'));
 test('Has usage guide', readmeContent.includes('## Using Custom Agents'));

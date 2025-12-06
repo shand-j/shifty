@@ -1,0 +1,27 @@
+{
+  "name": "@shifty/roi-service",
+  "version": "1.0.0",
+  "description": "ROI Analytics Service - DORA/SPACE metrics, ROI calculations, telemetry aggregation",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "@shifty/database": "*",
+    "@shifty/shared": "*",
+    "axios": "^1.6.0",
+    "fastify": "^4.24.3",
+    "prom-client": "^15.1.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.2.0"
+  }
+}

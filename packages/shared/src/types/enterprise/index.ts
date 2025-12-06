@@ -6,3 +6,5 @@ export * from './hitl-arcade';
 export * from './cicd-governor';
 export * from './production-feedback';
 export * from './integrations';
+export * from './roi-service';
+export * from './testing-modalities';

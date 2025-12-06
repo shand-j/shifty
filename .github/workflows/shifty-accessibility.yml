@@ -1,0 +1,235 @@
+# Shifty Accessibility Scan GitHub Action
+#
+# This workflow runs accessibility scans using Shifty's accessibility testing service
+# Supports WCAG 2.0, 2.1, 2.2 compliance levels
+#
+# Usage:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Configure target URLs and WCAG standard
+
+name: Shifty Accessibility Scan
+
+on:
+  # Run on deployments
+  deployment_status:
+
+  # Run on PRs that modify frontend
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'apps/**/*.tsx'
+      - 'apps/**/*.jsx'
+      - 'apps/**/*.html'
+      - 'packages/**/*.tsx'
+
+  # Run on schedule (weekly)
+  schedule:
+    - cron: '0 4 * * 1'  # 4 AM UTC every Monday
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL to scan'
+        required: true
+        type: string
+      wcag_standard:
+        description: 'WCAG compliance level'
+        required: false
+        type: choice
+        options:
+          - WCAG21AA
+          - WCAG2A
+          - WCAG2AA
+          - WCAG21A
+          - WCAG22AA
+        default: WCAG21AA
+      fail_on_serious:
+        description: 'Fail if serious issues found'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+
+jobs:
+  accessibility-scan:
+    runs-on: ubuntu-latest
+    
+    # Skip if not a successful deployment
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Target URL
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            URL="${{ inputs.target_url }}"
+          elif [ "${{ github.event_name }}" = "deployment_status" ]; then
+            URL="${{ github.event.deployment_status.target_url }}"
+          else
+            # Default to staging or preview URL
+            URL="${{ vars.STAGING_URL || 'https://staging.example.com' }}"
+          fi
+          
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Run Accessibility Scan
+        id: scan
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          STANDARD="${{ inputs.wcag_standard || 'WCAG21AA' }}"
+          TARGET="${{ steps.target.outputs.url }}"
+          
+          # Create scan configuration
+          CONFIG_RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/accessibility/configs" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{
+              \"tenantId\": \"${SHIFTY_TENANT_ID:-default}\",
+              \"name\": \"CI Accessibility Scan\",
+              \"targetUrls\": [\"$TARGET\"],
+              \"standard\": \"$STANDARD\",
+              \"settings\": {\"maxPages\": 10},
+              \"thresholds\": {\"maxCritical\": 0, \"maxSerious\": 0}
+            }")
+          
+          CONFIG_ID=$(echo $CONFIG_RESPONSE | jq -r '.data.id // empty')
+          
+          if [ -z "$CONFIG_ID" ]; then
+            echo "Failed to create scan config"
+            echo "$CONFIG_RESPONSE"
+            exit 1
+          fi
+          
+          # Start scan
+          SCAN_RESPONSE=$(curl -s -X POST "${SHIFTY_API_URL}/api/v1/accessibility/scans" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID:-default}" \
+            -d "{\"configId\": \"$CONFIG_ID\"}")
+          
+          SCAN_ID=$(echo $SCAN_RESPONSE | jq -r '.data.id // empty')
+          echo "scan_id=$SCAN_ID" >> $GITHUB_OUTPUT
+          echo "config_id=$CONFIG_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Scan to Complete
+        run: |
+          echo "Waiting for accessibility scan to complete..."
+          sleep 60  # Allow time for scan
+
+      - name: Get Scan Results
+        id: results
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          SCAN_ID="${{ steps.scan.outputs.scan_id }}"
+          
+          RESPONSE=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/accessibility/scans/$SCAN_ID" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}")
+          
+          echo "$RESPONSE" > accessibility-results.json
+          
+          SCORE=$(echo $RESPONSE | jq -r '.data.summary.accessibilityScore // 0')
+          CRITICAL=$(echo $RESPONSE | jq -r '.data.summary.criticalCount // 0')
+          SERIOUS=$(echo $RESPONSE | jq -r '.data.summary.seriousCount // 0')
+          MODERATE=$(echo $RESPONSE | jq -r '.data.summary.moderateCount // 0')
+          
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "serious=$SERIOUS" >> $GITHUB_OUTPUT
+          echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
+
+      - name: Get Issue Details
+        id: issues
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          SCAN_ID="${{ steps.scan.outputs.scan_id }}"
+          
+          RESPONSE=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/accessibility/scans/$SCAN_ID/issues" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}")
+          
+          echo "$RESPONSE" > accessibility-issues.json
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let results = {};
+            let issues = [];
+            
+            try {
+              results = JSON.parse(fs.readFileSync('accessibility-results.json', 'utf8'));
+              const issuesData = JSON.parse(fs.readFileSync('accessibility-issues.json', 'utf8'));
+              issues = issuesData.data || [];
+            } catch (e) {
+              console.error('Failed to read results:', e);
+            }
+            
+            const summary = results.data?.summary || {};
+            const score = summary.accessibilityScore || 0;
+            const hasIssues = (summary.criticalCount || 0) + (summary.seriousCount || 0) > 0;
+            const statusEmoji = hasIssues ? '⚠️' : '✅';
+            
+            // Build issue list (top 5)
+            const topIssues = issues.slice(0, 5).map(i => 
+              `- **${i.impact}**: ${i.description} ([${i.ruleId}](${i.helpUrl}))`
+            ).join('\n');
+            
+            const body = `## ${statusEmoji} Shifty Accessibility Scan Results
+            
+            **Accessibility Score: ${score}/100**
+            
+            | Impact | Count |
+            |--------|-------|
+            | 🔴 Critical | ${summary.criticalCount || 0} |
+            | 🟠 Serious | ${summary.seriousCount || 0} |
+            | 🟡 Moderate | ${summary.moderateCount || 0} |
+            | 🔵 Minor | ${summary.minorCount || 0} |
+            
+            ${issues.length > 0 ? `### Top Issues\n\n${topIssues}` : '**No accessibility issues found!**'}
+            
+            ---
+            *Powered by [Shifty Accessibility](https://shifty.ai)*
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Check Thresholds
+        if: inputs.fail_on_serious == true || github.event_name == 'pull_request'
+        run: |
+          CRITICAL="${{ steps.results.outputs.critical }}"
+          SERIOUS="${{ steps.results.outputs.serious }}"
+          
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ Critical accessibility issues found!"
+            exit 1
+          fi
+          
+          if [ "${{ inputs.fail_on_serious }}" = "true" ] && [ "$SERIOUS" -gt 0 ]; then
+            echo "❌ Serious accessibility issues found!"
+            exit 1
+          fi
+          
+          echo "✅ Accessibility scan passed!"

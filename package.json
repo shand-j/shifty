@@ -9,6 +9,7 @@
     "packages/database",
     "packages/sdk-core",
     "packages/sdk-playwright",
+    "packages/sdk-observability",
     "apps/api-gateway",
     "services/tenant-manager",
     "services/auth-service",
@@ -21,7 +22,12 @@
     "services/hitl-arcade",
     "services/cicd-governor",
     "services/production-feedback",
-    "services/integrations"
+    "services/integrations",
+    "services/roi-service",
+    "services/performance-testing",
+    "services/security-testing",
+    "services/accessibility-testing",
+    "services/manual-session-hub"
   ],
   "scripts": {
     "dev": "turbo run dev",

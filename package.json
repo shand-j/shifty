@@ -11,6 +11,7 @@
     "packages/sdk-playwright",
     "packages/sdk-observability",
     "apps/api-gateway",
+    "apps/web",
     "services/tenant-manager",
     "services/auth-service",
     "services/ai-orchestrator",

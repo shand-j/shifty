@@ -97,7 +97,7 @@ RESPONSE:`;
    * Get persona-specific instructions
    */
   private getPersonaInstructions(persona: string): string {
-    const instructions = {
+    const instructions: Record<string, string> = {
       product: `
 You're helping Product Owners with:
 - Release readiness assessments
@@ -218,7 +218,7 @@ Use management language and focus on team outcomes.`
    * Get escalation target based on persona
    */
   private getEscalationTarget(persona: string): 'product' | 'design' | 'qa' | 'dev' | 'manager' {
-    const targets = {
+    const targets: Record<string, 'product' | 'design' | 'qa' | 'dev' | 'manager'> = {
       product: 'product',
       design: 'design',
       qa: 'qa',

@@ -283,12 +283,44 @@ console.log('Sources:', response.sources);
 
 ## Future Enhancements
 
-- [ ] Persistent vector database (Qdrant/Pinecone)
-- [ ] Multi-modal support (images, diagrams)
-- [ ] Voice interface integration
-- [ ] Advanced training pipeline with RLHF
-- [ ] Team-specific fine-tuning
-- [ ] Proactive insights and recommendations
-- [ ] Integration with Jira, Figma, GitHub APIs
+### High Priority (MVP Limitations to Address)
+- [ ] **Persistent vector database** (Qdrant/Pinecone) - Currently in-memory, data lost on restart
+- [ ] **Redis for session storage** - Currently in-memory Map, not scalable
+- [ ] **Configurable thresholds** - Hard-coded confidence and timeout values
+- [ ] **Active scheduled ingestion** - Currently disabled, knowledge base doesn't auto-update
+- [ ] **Workspace protocol dependencies** - Replace wildcard (*) with workspace:* for stability
+
+### Medium Priority
+- [ ] React UI components for chat interface
+- [ ] Direct Jira/Figma API integration
+- [ ] Voice interface
+- [ ] RLHF training pipeline
+- [ ] Usage analytics dashboard
 - [ ] Custom persona creation
-- [ ] Analytics dashboard for usage metrics
+- [ ] Multi-modal support (images, diagrams)
+- [ ] Proactive insights and recommendations
+
+## Known Limitations (MVP)
+
+1. **In-Memory Storage**: Knowledge base and chat sessions stored in memory
+   - Data lost on service restart
+   - Not suitable for production scale
+   - Recommend: Implement Redis + Qdrant for production
+
+2. **No Persistence**: Vector embeddings regenerated on restart
+   - Expensive and time-consuming for large datasets
+   - Recommend: Use persistent vector database
+
+3. **Scheduled Ingestion Disabled**: Knowledge base won't auto-update
+   - Requires manual trigger via `/api/v1/qe/knowledge/index`
+   - Recommend: Enable scheduled ingestion with proper tenant management
+
+4. **Hard-Coded Configuration**: Thresholds and timeouts not configurable
+   - Confidence threshold: 30%
+   - HTTP timeouts: 5000ms
+   - Recommend: Move to environment variables
+
+5. **No Session Cleanup**: Old chat sessions never expire
+   - Memory leak potential
+   - Recommend: Implement TTL-based cleanup
+

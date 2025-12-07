@@ -365,11 +365,18 @@ class APIGateway {
       console.warn('⚠️ WARNING: ALLOWED_ORIGINS not configured in production');
     }
 
+    // Add frontend origins for development
+    const defaultOrigins = [
+      'http://localhost:3010',
+      'http://localhost:3000', // Next.js dev server
+      'http://frontend:3000' // Docker frontend service
+    ];
+
     await fastify.register(cors, {
-      origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:3010'],
+      origin: corsOrigins.length > 0 ? corsOrigins : defaultOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID', 'X-Mock-Mode'],
       exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
       maxAge: 86400 // 24 hours
     });
@@ -632,6 +639,23 @@ class APIGateway {
 
     // Authentication middleware
     fastify.addHook('preHandler', async (request, reply) => {
+      // Check if mock mode is enabled and intercept the request
+      try {
+        const { mockInterceptor, initializeMockData } = await import('./middleware/mock-interceptor');
+        
+        // Initialize mock data once on first request
+        const isMockMode = process.env.MOCK_MODE === 'true' || request.headers['x-mock-mode'] === 'true';
+        if (isMockMode) {
+          initializeMockData();
+          const handled = await mockInterceptor(request, reply);
+          if (handled) {
+            return; // Request was handled by mock interceptor
+          }
+        }
+      } catch (error) {
+        console.log('Mock interceptor not available, continuing with real backend');
+      }
+      
       try {
         const service = this.services.find(s =>
           request.url.startsWith(s.prefix)

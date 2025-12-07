@@ -27,22 +27,21 @@ export function LoginPage() {
     setError("")
     setLoading(true)
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Hardcoded credentials: test / test
-    if (username === "test" && password === "test") {
-      setUser({
-        id: "1",
-        name: "Test User",
-        email: "test@shifty.dev",
-        avatar: "/developer-working.png",
-        persona: "qa",
-        role: "admin",
-      })
+    try {
+      // Import API client dynamically to avoid SSR issues
+      const { apiClient } = await import("@/lib/api-client")
+      
+      // Call real/mock API
+      const response = await apiClient.login(username, password)
+      
+      // Set user in store
+      setUser(response.user)
+      
+      // Redirect to dashboard
       router.push("/dashboard")
-    } else {
-      setError("Invalid credentials. Use username: test, password: test")
+    } catch (err: any) {
+      const errorMessage = err?.message || "Invalid credentials. Please try again."
+      setError(errorMessage)
       setLoading(false)
     }
   }
@@ -193,7 +192,9 @@ export function LoginPage() {
             {/* Demo credentials hint */}
             <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
               <p className="text-xs text-muted-foreground">
-                Demo credentials: <code className="text-primary">test</code> /{" "}
+                Demo: <code className="text-primary">dev@shifty.ai</code> /{" "}
+                <code className="text-primary">test</code> or{" "}
+                <code className="text-primary">qa@shifty.ai</code> /{" "}
                 <code className="text-primary">test</code>
               </p>
             </div>

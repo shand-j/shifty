@@ -8,6 +8,10 @@ coverage/
 .env.local
 *.local
 
+# Next.js build artifacts
+.next/
+out/
+
 # Build artifacts
 *.js.map
 *.d.ts

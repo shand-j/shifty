@@ -167,5 +167,6 @@
   "sonarlint.connectedMode.project": {
     "connectionId": "shand-j",
     "projectKey": "shand-j_shifty"
-  }
+  },
+  "todo-tree.tree.scanMode": "workspace only"
 }

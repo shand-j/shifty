@@ -27,22 +27,30 @@ export function LoginPage() {
     setError("")
     setLoading(true)
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Hardcoded credentials: test / test
-    if (username === "test" && password === "test") {
-      setUser({
-        id: "1",
-        name: "Test User",
-        email: "test@shifty.dev",
-        avatar: "/developer-working.png",
-        persona: "qa",
-        role: "admin",
+    try {
+      // Import API client dynamically to avoid SSR issues
+      const { apiClient } = await import("@/lib/api-client")
+      
+      // Call login API
+      const response = await apiClient.login({
+        email: username,
+        password: password
       })
+
+      // Set user in store
+      setUser({
+        id: response.user.id,
+        name: `${response.user.firstName} ${response.user.lastName}`,
+        email: response.user.email,
+        persona: response.user.persona as any,
+        role: response.user.role as any,
+      })
+
+      // Navigate to dashboard
       router.push("/dashboard")
-    } else {
-      setError("Invalid credentials. Use username: test, password: test")
+    } catch (err: any) {
+      console.error("Login error:", err)
+      setError(err.message || "Invalid credentials. Please try again.")
       setLoading(false)
     }
   }
@@ -193,8 +201,11 @@ export function LoginPage() {
             {/* Demo credentials hint */}
             <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
               <p className="text-xs text-muted-foreground">
-                Demo credentials: <code className="text-primary">test</code> /{" "}
-                <code className="text-primary">test</code>
+                Demo credentials: <code className="text-primary">dev@shifty.ai</code> /{" "}
+                <code className="text-primary">password123</code>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Or try: qa@shifty.ai, po@shifty.ai, designer@shifty.ai, manager@shifty.ai
               </p>
             </div>
           </CardContent>

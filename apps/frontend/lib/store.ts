@@ -1,69 +1,84 @@
 "use client"
 
 import { create } from "zustand"
+import { persist } from "zustand/middleware"
 import type { User, Tenant, Notification } from "./types"
 
 interface AppState {
   user: User | null
   tenant: Tenant | null
+  token: string | null
+  isAuthenticated: boolean
+  isLoading: boolean
   sidebarCollapsed: boolean
   commandPaletteOpen: boolean
   notifications: Notification[]
   setUser: (user: User | null) => void
   setTenant: (tenant: Tenant | null) => void
+  setToken: (token: string | null) => void
+  setAuthenticated: (isAuthenticated: boolean) => void
+  setLoading: (isLoading: boolean) => void
   toggleSidebar: () => void
   setSidebarCollapsed: (collapsed: boolean) => void
   setCommandPaletteOpen: (open: boolean) => void
   setNotifications: (notifications: Notification[]) => void
   markNotificationRead: (id: string) => void
+  logout: () => void
+  loadNotifications: () => Promise<void>
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  user: null,
-  tenant: {
-    id: "1",
-    name: "Acme Corp",
-    slug: "acme",
-  },
-  sidebarCollapsed: false,
-  commandPaletteOpen: false,
-  notifications: [
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      tenant: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      sidebarCollapsed: false,
+      commandPaletteOpen: false,
+      notifications: [],
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setTenant: (tenant) => set({ tenant }),
+      setToken: (token) => set({ token }),
+      setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
+      setLoading: (isLoading) => set({ isLoading }),
+      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+      setNotifications: (notifications) => set({ notifications }),
+      markNotificationRead: (id) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        })),
+      logout: () => {
+        set({ user: null, tenant: null, token: null, isAuthenticated: false })
+        // Clear API client token
+        if (typeof window !== 'undefined') {
+          import('./api-client').then(({ apiClient }) => {
+            apiClient.clearToken()
+          })
+        }
+      },
+      loadNotifications: async () => {
+        try {
+          const { apiClient } = await import('./api-client')
+          const notifications = await apiClient.getNotifications()
+          set({ notifications })
+        } catch (error) {
+          console.error('Failed to load notifications:', error)
+        }
+      }
+    }),
     {
-      id: "1",
-      type: "ci_failure",
-      title: "Pipeline Failed",
-      message: "main branch build failed on acme/web-app",
-      read: false,
-      createdAt: new Date().toISOString(),
-      link: "/pipelines/1",
-    },
-    {
-      id: "2",
-      type: "healing_required",
-      title: "Selector Healing Required",
-      message: "3 selectors need review (confidence < 70%)",
-      read: false,
-      createdAt: new Date().toISOString(),
-      link: "/healing",
-    },
-    {
-      id: "3",
-      type: "roi_alert",
-      title: "ROI Milestone",
-      message: "You saved 120 hours this month!",
-      read: true,
-      createdAt: new Date().toISOString(),
-      link: "/insights/roi",
-    },
-  ],
-  setUser: (user) => set({ user }),
-  setTenant: (tenant) => set({ tenant }),
-  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
-  setNotifications: (notifications) => set({ notifications }),
-  markNotificationRead: (id) =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    })),
-}))
+      name: "shifty-app-storage",
+      partialize: (state) => ({
+        user: state.user,
+        tenant: state.tenant,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+        sidebarCollapsed: state.sidebarCollapsed,
+      }),
+    }
+  )
+)

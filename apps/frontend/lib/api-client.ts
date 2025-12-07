@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { User, Notification, Tenant } from './types';
 
 // API Client Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -17,14 +18,7 @@ interface ApiError {
 interface AuthResponse {
   token: string;
   refreshToken?: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    persona: string;
-    role: string;
-  };
+  user: User;
 }
 
 interface RefreshTokenResponse {
@@ -223,34 +217,24 @@ class APIClient {
     }
   }
 
-  async getCurrentUser(): Promise<AuthResponse['user']> {
-    const response = await this.client.get<AuthResponse['user']>('/api/v1/auth/me');
+  async getCurrentUser(): Promise<User> {
+    const response = await this.client.get<User>('/api/v1/auth/me');
     return response.data;
   }
 
   // Tenant endpoints
-  async getCurrentTenant(): Promise<{ id: string; name: string; slug: string }> {
-    const response = await this.client.get('/api/v1/tenants/current');
+  async getCurrentTenant(): Promise<Tenant> {
+    const response = await this.client.get<Tenant>('/api/v1/tenants/current');
     return response.data;
   }
 
-  async getTenants(): Promise<Array<{ id: string; name: string; slug: string }>> {
+  async getTenants(): Promise<Tenant[]> {
     const response = await this.client.get('/api/v1/tenants');
     return response.data;
   }
 
   // Notifications
-  async getNotifications(): Promise<
-    Array<{
-      id: string;
-      type: string;
-      title: string;
-      message: string;
-      read: boolean;
-      createdAt: string;
-      link?: string;
-    }>
-  > {
+  async getNotifications(): Promise<Notification[]> {
     const response = await this.client.get('/api/v1/notifications');
     return response.data;
   }

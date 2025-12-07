@@ -41,7 +41,7 @@ export interface MockTest {
   duration: number;
 }
 
-const testFrameworks = ['playwright', 'cypress', 'jest', 'vitest'] as const;
+const testFrameworks: Array<'playwright' | 'cypress' | 'jest' | 'vitest'> = ['playwright', 'cypress', 'jest', 'vitest'];
 const testTypes = ['Login', 'Navigation', 'Form submission', 'Data validation', 'API integration', 'UI rendering'];
 
 function generateMockTest(suiteId: string, projectId: string, index: number): MockTest {

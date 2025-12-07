@@ -1,25 +1,9 @@
 // Mock data generator without external dependencies
 // Using built-in crypto for randomization
 
-const crypto = typeof window !== 'undefined' ? window.crypto : require('crypto');
-
 function randomInt(min: number, max: number): number {
-  const range = max - min + 1;
-  const bytes = Math.ceil(Math.log2(range) / 8);
-  const array = new Uint8Array(bytes);
-  
-  if (typeof window !== 'undefined') {
-    crypto.getRandomValues(array);
-  } else {
-    crypto.randomFillSync(array);
-  }
-  
-  let result = 0;
-  for (let i = 0; i < bytes; i++) {
-    result = result * 256 + array[i];
-  }
-  
-  return min + (result % range);
+  // Use Math.random() for simplicity in Node.js environment
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function randomChoice<T>(array: T[]): T {

@@ -7,3 +7,11 @@ coverage/
 .env
 .env.local
 *.local
+
+# Build artifacts
+*.js.map
+*.d.ts
+
+# Except for config files that should be .ts
+!*.config.ts
+!jest.config.js

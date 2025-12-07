@@ -46,7 +46,7 @@ function personaOrder(persona: Persona): number[] {
 export default function Shell() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const isDark = useThemeStore((s) => s.isDark);
+  const isDark = useThemeStore((s) => s.dark);
   const toggleTheme = useThemeStore((s) => s.toggle);
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);

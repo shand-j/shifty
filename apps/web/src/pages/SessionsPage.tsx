@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Plus, Video, Play, Pause, Square } from 'lucide-react';
+import { Plus, Video, Pause, Square } from 'lucide-react';
 
 interface Session {
   id: string;

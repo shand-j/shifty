@@ -193,6 +193,9 @@ services:
       - shifty-network
 
   # API Gateway (Single definition - removed duplicate)
+  # API Gateway
+  # Central routing service that proxies requests to all backend services
+  # Service URLs reference other services defined elsewhere in this file (order doesn't matter for docker-compose)
   api-gateway:
     build:
       context: .
@@ -203,11 +206,22 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
+      # Core services
       - TENANT_MANAGER_URL=http://tenant-manager:3001
       - AUTH_SERVICE_URL=http://auth-service:3002
       - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
       - TEST_GENERATOR_URL=http://test-generator:3004
       - HEALING_ENGINE_URL=http://healing-engine:3005
+      # Testing modalities
+      - ROI_SERVICE_URL=http://roi-service:3015
+      - PERFORMANCE_TESTING_URL=http://performance-testing:3016
+      - SECURITY_TESTING_URL=http://security-testing:3017
+      - ACCESSIBILITY_TESTING_URL=http://accessibility-testing:3018
+      # Collaboration & orchestration
+      - MANUAL_SESSION_HUB_URL=http://manual-session-hub:3019
+      - HITL_ARCADE_URL=http://hitl-arcade:3011
+      - CICD_GOVERNOR_URL=http://cicd-governor:3012
+      # Security
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
       - REDIS_URL=redis://redis:6379
     depends_on:
@@ -222,6 +236,20 @@ services:
       test-generator:
         condition: service_started
       healing-engine:
+        condition: service_started
+      roi-service:
+        condition: service_started
+      performance-testing:
+        condition: service_started
+      security-testing:
+        condition: service_started
+      accessibility-testing:
+        condition: service_started
+      manual-session-hub:
+        condition: service_started
+      hitl-arcade:
+        condition: service_started
+      cicd-governor:
         condition: service_started
     networks:
       - shifty-network
@@ -387,6 +415,135 @@ services:
     depends_on:
       platform-db:
         condition: service_healthy
+    networks:
+      - shifty-network
+
+  # ROI Service
+  roi-service:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/roi-service
+        PACKAGE_NAME: "@shifty/roi-service"
+    container_name: shifty-roi-service
+    ports:
+      - "3015:3015"
+    environment:
+      - NODE_ENV=development
+      - PORT=3015
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Performance Testing Service
+  performance-testing:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/performance-testing
+        PACKAGE_NAME: "@shifty/performance-testing"
+    container_name: shifty-performance-testing
+    ports:
+      - "3016:3016"
+    environment:
+      - NODE_ENV=development
+      - PORT=3016
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Security Testing Service
+  security-testing:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/security-testing
+        PACKAGE_NAME: "@shifty/security-testing"
+    container_name: shifty-security-testing
+    ports:
+      - "3017:3017"
+    environment:
+      - NODE_ENV=development
+      - PORT=3017
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Accessibility Testing Service
+  accessibility-testing:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/accessibility-testing
+        PACKAGE_NAME: "@shifty/accessibility-testing"
+    container_name: shifty-accessibility-testing
+    ports:
+      - "3018:3018"
+    environment:
+      - NODE_ENV=development
+      - PORT=3018
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Manual Session Hub Service
+  manual-session-hub:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/manual-session-hub
+        PACKAGE_NAME: "@shifty/manual-session-hub"
+    container_name: shifty-manual-session-hub
+    ports:
+      - "3019:3019"
+    environment:
+      - NODE_ENV=development
+      - PORT=3019
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # QE Collaborator Service
+  qe-collaborator:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/qe-collaborator
+        PACKAGE_NAME: "@shifty/qe-collaborator"
+    container_name: shifty-qe-collaborator
+    ports:
+      - "3020:3020"
+    environment:
+      - NODE_ENV=development
+      - PORT=3020
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - OLLAMA_ENDPOINT=http://ollama:11434
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - shifty-network
 

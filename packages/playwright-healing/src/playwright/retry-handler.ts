@@ -1,12 +1,12 @@
 /**
  * Retry Handler for Timeouts and Flakiness
- * 
+ *
  * Handles intelligent retries for timeout errors and flaky test detection.
  */
 
-import { Page } from '@playwright/test';
-import { HealingEngine } from '../core/healer';
-import { HealingConfig } from '../core/types';
+import { Page } from "@playwright/test";
+import { HealingEngine } from "../core/healer";
+import { HealingConfig } from "../core/types";
 
 export interface RetryOptions {
   maxRetries?: number;
@@ -31,8 +31,10 @@ export class RetryHandler {
     action: () => Promise<T>,
     options: RetryOptions = {}
   ): Promise<T> {
-    const maxRetries: number = options.maxRetries ?? this.config.retry.maxRetries ?? 2;
-    const initialBackoff: number = options.initialBackoff ?? this.config.retry.initialBackoff ?? 1000;
+    const maxRetries: number =
+      options.maxRetries ?? this.config.retry.maxRetries ?? 2;
+    const initialBackoff: number =
+      options.initialBackoff ?? this.config.retry.initialBackoff ?? 1000;
     const maxBackoff: number = options.maxBackoff ?? 10000;
 
     let lastError: Error | null = null;
@@ -46,7 +48,7 @@ export class RetryHandler {
 
         // Check if we should retry
         const shouldRetry = this.shouldRetry(error, attempt, maxRetries);
-        
+
         if (!shouldRetry) {
           throw error;
         }
@@ -64,7 +66,7 @@ export class RetryHandler {
       }
     }
 
-    throw lastError || new Error('Max retries exceeded');
+    throw lastError || new Error("Max retries exceeded");
   }
 
   /**
@@ -84,7 +86,7 @@ export class RetryHandler {
         // If action fails, try healing the selector
         if (this.isLocatorError(error)) {
           const healingResult = await this.engine.heal(page, selector);
-          
+
           if (healingResult.success) {
             const healedLocator = page.locator(healingResult.selector);
             return await action(healedLocator);
@@ -98,7 +100,11 @@ export class RetryHandler {
   /**
    * Determine if an error should trigger a retry
    */
-  private shouldRetry(error: Error, attempt: number, maxRetries: number): boolean {
+  private shouldRetry(
+    error: Error,
+    attempt: number,
+    maxRetries: number
+  ): boolean {
     if (attempt >= maxRetries) {
       return false;
     }
@@ -108,13 +114,13 @@ export class RetryHandler {
     // Retry on timeout errors
     if (this.config.retry.onTimeout) {
       const timeoutPatterns = [
-        'timeout',
-        'timed out',
-        'waiting for selector',
-        'waiting for element',
-        'exceeded timeout',
+        "timeout",
+        "timed out",
+        "waiting for selector",
+        "waiting for element",
+        "exceeded timeout",
       ];
-      
+
       if (timeoutPatterns.some((pattern) => errorMessage.includes(pattern))) {
         return true;
       }
@@ -122,13 +128,13 @@ export class RetryHandler {
 
     // Retry on network errors
     const networkPatterns = [
-      'net::err',
-      'network error',
-      'connection refused',
-      'econnrefused',
-      'socket hang up',
+      "net::err",
+      "network error",
+      "connection refused",
+      "econnrefused",
+      "socket hang up",
     ];
-    
+
     if (networkPatterns.some((pattern) => errorMessage.includes(pattern))) {
       return true;
     }
@@ -136,13 +142,13 @@ export class RetryHandler {
     // Retry on element state errors (potential flakiness)
     if (this.config.retry.onFlakiness) {
       const flakyPatterns = [
-        'element is not visible',
-        'element is not attached',
-        'element is not stable',
-        'intercepts pointer events',
-        'not actionable',
+        "element is not visible",
+        "element is not attached",
+        "element is not stable",
+        "intercepts pointer events",
+        "not actionable",
       ];
-      
+
       if (flakyPatterns.some((pattern) => errorMessage.includes(pattern))) {
         return true;
       }
@@ -157,13 +163,13 @@ export class RetryHandler {
   private isLocatorError(error: Error): boolean {
     const errorMessage = error.message.toLowerCase();
     const locatorPatterns = [
-      'locator',
-      'selector',
-      'element not found',
-      'no element matches',
-      'could not find',
+      "locator",
+      "selector",
+      "element not found",
+      "no element matches",
+      "could not find",
     ];
-    
+
     return locatorPatterns.some((pattern) => errorMessage.includes(pattern));
   }
 
@@ -181,16 +187,16 @@ export class RetryHandler {
     return {
       enabled: config.enabled ?? true,
       strategies: config.strategies ?? [
-        'data-testid-recovery',
-        'text-content-matching',
-        'css-hierarchy-analysis',
-        'ai-powered-analysis',
+        "data-testid-recovery",
+        "text-content-matching",
+        "css-hierarchy-analysis",
+        "ai-powered-analysis",
       ],
       maxAttempts: config.maxAttempts ?? 3,
       cacheHealing: config.cacheHealing ?? true,
       ollama: {
-        url: config.ollama?.url ?? 'http://localhost:11434',
-        model: config.ollama?.model ?? 'llama3.1:8b',
+        url: config.ollama?.url ?? "http://localhost:11434",
+        model: config.ollama?.model ?? "qwen2.5-coder:3b",
         timeout: config.ollama?.timeout ?? 30000,
       },
       retry: {
@@ -201,7 +207,7 @@ export class RetryHandler {
       },
       telemetry: {
         enabled: config.telemetry?.enabled ?? true,
-        logLevel: config.telemetry?.logLevel ?? 'info',
+        logLevel: config.telemetry?.logLevel ?? "info",
       },
     };
   }

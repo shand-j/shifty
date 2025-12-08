@@ -1,38 +1,42 @@
 /**
  * AI-Powered Analysis Strategy
- * 
+ *
  * Uses Ollama LLM to analyze page structure and suggest alternative selectors.
  * Takes screenshots and DOM structure for context.
  */
 
-import { Page } from '@playwright/test';
+import { Page } from "@playwright/test";
 import {
   HealingResult,
   HealingStrategyInterface,
   HealingStrategyOptions,
-} from '../types';
-import { checkSelectorExists, validateUrl } from './utils';
+} from "../types";
+import { checkSelectorExists, validateUrl } from "./utils";
 
 export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
-  readonly name = 'ai-powered-analysis' as const;
+  readonly name = "ai-powered-analysis" as const;
 
   private ollamaUrl: string;
   private model: string;
   private timeout: number;
 
-  constructor(options: {
-    ollamaUrl?: string;
-    model?: string;
-    timeout?: number;
-  } = {}) {
-    this.ollamaUrl = options.ollamaUrl || 'http://localhost:11434';
-    
+  constructor(
+    options: {
+      ollamaUrl?: string;
+      model?: string;
+      timeout?: number;
+    } = {}
+  ) {
+    this.ollamaUrl = options.ollamaUrl || "http://localhost:11434";
+
     // Validate Ollama URL to prevent SSRF attacks
     if (!validateUrl(this.ollamaUrl)) {
-      throw new Error('Invalid Ollama URL. Only localhost and 127.0.0.1 are allowed for security.');
+      throw new Error(
+        "Invalid Ollama URL. Only localhost and 127.0.0.1 are allowed for security."
+      );
     }
-    
-    this.model = options.model || 'llama3.1:8b';
+
+    this.model = options.model || "qwen2.5-coder:3b";
     this.timeout = options.timeout || 30000;
   }
 
@@ -51,12 +55,15 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
           confidence: 0,
           strategy: this.name,
           alternatives: [],
-          error: 'Ollama is not available. Please ensure Ollama is running.',
+          error: "Ollama is not available. Please ensure Ollama is running.",
         };
       }
 
       // Get page context
-      const pageContext = await this.extractPageContext(page, options.maxElements || 50);
+      const pageContext = await this.extractPageContext(
+        page,
+        options.maxElements || 50
+      );
 
       // Build prompt for AI
       const prompt = this.buildPrompt(
@@ -78,7 +85,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
           confidence: 0,
           strategy: this.name,
           alternatives: [],
-          error: 'AI did not suggest any alternatives',
+          error: "AI did not suggest any alternatives",
           metadata: {
             aiResponse,
           },
@@ -111,7 +118,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
         confidence: 0,
         strategy: this.name,
         alternatives: suggestions.map((s) => s.selector),
-        error: 'None of the AI suggestions matched elements on the page',
+        error: "None of the AI suggestions matched elements on the page",
         metadata: {
           aiResponse,
           suggestions: suggestions.length,
@@ -143,7 +150,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(`${this.ollamaUrl}/api/tags`, {
-        method: 'GET',
+        method: "GET",
         signal: controller.signal,
       });
 
@@ -189,7 +196,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
         visible: boolean;
       }> = [];
 
-      const allElements = document.querySelectorAll('*');
+      const allElements = document.querySelectorAll("*");
 
       for (const el of Array.from(allElements)) {
         if (result.length >= max) break;
@@ -197,16 +204,20 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
         const element = el as HTMLElement;
         const style = window.getComputedStyle(element);
         const isVisible =
-          style.display !== 'none' &&
-          style.visibility !== 'hidden' &&
-          style.opacity !== '0';
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          style.opacity !== "0";
 
         const text = element.textContent?.trim().substring(0, 100);
 
         // Prioritize interactive elements
-        const isInteractive = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(
-          element.tagName
-        );
+        const isInteractive = [
+          "BUTTON",
+          "A",
+          "INPUT",
+          "SELECT",
+          "TEXTAREA",
+        ].includes(element.tagName);
 
         if (isInteractive || (isVisible && text && text.length > 0)) {
           result.push({
@@ -215,11 +226,11 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
             classes: Array.from(element.classList),
             text: text || undefined,
             testId:
-              element.getAttribute('data-testid') ||
-              element.getAttribute('data-test-id') ||
+              element.getAttribute("data-testid") ||
+              element.getAttribute("data-test-id") ||
               undefined,
-            role: element.getAttribute('role') || undefined,
-            type: element.getAttribute('type') || undefined,
+            role: element.getAttribute("role") || undefined,
+            type: element.getAttribute("type") || undefined,
             visible: isVisible,
           });
         }
@@ -250,7 +261,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
 ${brokenSelector}
 \`\`\`
 
-${expectedType ? `**Expected Element Type**: ${expectedType}\n` : ''}
+${expectedType ? `**Expected Element Type**: ${expectedType}\n` : ""}
 **Page Information**:
 - URL: ${pageContext.url}
 - Title: ${pageContext.title}
@@ -297,9 +308,9 @@ Provide your response now:`;
 
     try {
       const response = await fetch(`${this.ollamaUrl}/api/generate`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           model: this.model,
@@ -316,15 +327,17 @@ Provide your response now:`;
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Ollama API error: ${response.status} ${response.statusText}`
+        );
       }
 
-      const data = await response.json() as { response?: string };
-      return data.response || '';
+      const data = (await response.json()) as { response?: string };
+      return data.response || "";
     } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
-        throw new Error('Ollama request timed out');
+      if (error.name === "AbortError") {
+        throw new Error("Ollama request timed out");
       }
       throw error;
     }
@@ -349,7 +362,7 @@ Provide your response now:`;
         const parsed = JSON.parse(jsonMatch[0]);
         if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
           for (const item of parsed.suggestions) {
-            if (item.selector && typeof item.selector === 'string') {
+            if (item.selector && typeof item.selector === "string") {
               suggestions.push({
                 selector: item.selector.trim(),
                 confidence: item.confidence || 0.7,

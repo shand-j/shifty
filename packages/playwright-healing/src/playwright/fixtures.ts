@@ -1,14 +1,14 @@
 /**
  * Playwright Test Fixtures with Auto-Healing
- * 
+ *
  * Provides test fixtures that automatically heal broken selectors.
  */
 
-import { test as base, expect as playwrightExpect } from '@playwright/test';
-import { HealingPage } from './page-wrapper';
-import { RetryHandler } from './retry-handler';
-import { HealingEngine } from '../core/healer';
-import { HealingConfig } from '../core/types';
+import { test as base, expect as playwrightExpect } from "@playwright/test";
+import { HealingEngine } from "../core/healer";
+import { HealingConfig } from "../core/types";
+import { HealingPage } from "./page-wrapper";
+import { RetryHandler } from "./retry-handler";
 
 /**
  * Fixtures available in healing tests
@@ -28,29 +28,29 @@ export interface HealingFixtures {
  * Default healing configuration
  */
 const defaultHealingConfig: HealingConfig = {
-  enabled: process.env.HEALING_ENABLED !== 'false',
+  enabled: process.env.HEALING_ENABLED !== "false",
   strategies: [
-    'data-testid-recovery',
-    'text-content-matching',
-    'css-hierarchy-analysis',
-    'ai-powered-analysis',
+    "data-testid-recovery",
+    "text-content-matching",
+    "css-hierarchy-analysis",
+    "ai-powered-analysis",
   ],
-  maxAttempts: parseInt(process.env.HEALING_MAX_ATTEMPTS || '3'),
-  cacheHealing: process.env.HEALING_CACHE !== 'false',
+  maxAttempts: parseInt(process.env.HEALING_MAX_ATTEMPTS || "3"),
+  cacheHealing: process.env.HEALING_CACHE !== "false",
   ollama: {
-    url: process.env.OLLAMA_URL || 'http://localhost:11434',
-    model: process.env.OLLAMA_MODEL || 'llama3.1:8b',
-    timeout: parseInt(process.env.OLLAMA_TIMEOUT || '30000'),
+    url: process.env.OLLAMA_URL || "http://localhost:11434",
+    model: process.env.OLLAMA_MODEL || "qwen2.5-coder:3b",
+    timeout: parseInt(process.env.OLLAMA_TIMEOUT || "30000"),
   },
   retry: {
-    onTimeout: process.env.RETRY_ON_TIMEOUT !== 'false',
-    onFlakiness: process.env.RETRY_ON_FLAKINESS !== 'false',
-    maxRetries: parseInt(process.env.MAX_RETRIES || '2'),
-    initialBackoff: parseInt(process.env.INITIAL_BACKOFF || '1000'),
+    onTimeout: process.env.RETRY_ON_TIMEOUT !== "false",
+    onFlakiness: process.env.RETRY_ON_FLAKINESS !== "false",
+    maxRetries: parseInt(process.env.MAX_RETRIES || "2"),
+    initialBackoff: parseInt(process.env.INITIAL_BACKOFF || "1000"),
   },
   telemetry: {
-    enabled: process.env.TELEMETRY_ENABLED !== 'false',
-    logLevel: (process.env.LOG_LEVEL as any) || 'info',
+    enabled: process.env.TELEMETRY_ENABLED !== "false",
+    logLevel: (process.env.LOG_LEVEL as any) || "info",
   },
 };
 
@@ -73,11 +73,11 @@ export const healingTest = base.extend<HealingFixtures>({
   healingPage: async ({ page, healingConfig }, use) => {
     const healingPage = new HealingPage(page, healingConfig);
     await use(healingPage);
-    
+
     // Log healing stats after test
     const stats = healingPage.getHealingStats();
     if (stats.attempts.size > 0) {
-      console.log('\n[Healing Stats]');
+      console.log("\n[Healing Stats]");
       for (const [healing, count] of stats.attempts.entries()) {
         console.log(`  ${healing}: ${count} time(s)`);
       }
@@ -88,11 +88,13 @@ export const healingTest = base.extend<HealingFixtures>({
 /**
  * Configure healing for all tests
  */
-export function configureHealing(config: Partial<HealingConfig>): typeof healingTest {
+export function configureHealing(
+  config: Partial<HealingConfig>
+): typeof healingTest {
   const mergedConfig = { ...defaultHealingConfig, ...config };
   return base.extend<HealingFixtures>({
     healingConfig: [mergedConfig, { option: true }],
-    
+
     healingEngine: async ({ healingConfig }, use) => {
       const engine = new HealingEngine(healingConfig);
       await use(engine);
@@ -106,10 +108,10 @@ export function configureHealing(config: Partial<HealingConfig>): typeof healing
     healingPage: async ({ page, healingConfig }, use) => {
       const healingPage = new HealingPage(page, healingConfig);
       await use(healingPage);
-      
+
       const stats = healingPage.getHealingStats();
       if (stats.attempts.size > 0) {
-        console.log('\n[Healing Stats]');
+        console.log("\n[Healing Stats]");
         for (const [healing, count] of stats.attempts.entries()) {
           console.log(`  ${healing}: ${count} time(s)`);
         }
@@ -213,4 +215,4 @@ export const healingExpect = {
 /**
  * Re-export Playwright expect for non-healing assertions
  */
-export { expect } from '@playwright/test';
+export { expect } from "@playwright/test";

@@ -42,18 +42,18 @@ yarn add @shifty/playwright-healing
 ### Basic Usage
 
 ```typescript
-import { healingTest, expect } from '@shifty/playwright-healing';
+import { healingTest, expect } from "@shifty/playwright-healing";
 
-healingTest('login flow', async ({ healingPage }) => {
-  await healingPage.goto('https://example.com/login');
-  
+healingTest("login flow", async ({ healingPage }) => {
+  await healingPage.goto("https://example.com/login");
+
   // These selectors will auto-heal if they break
-  await healingPage.fill('#username', 'user@test.com');
-  await healingPage.fill('#password', 'SecurePass123!');
+  await healingPage.fill("#username", "user@test.com");
+  await healingPage.fill("#password", "SecurePass123!");
   await healingPage.click('button[type="submit"]');
-  
+
   // Verify success
-  const welcome = await healingPage.locator('.welcome-message');
+  const welcome = await healingPage.locator(".welcome-message");
   await expect(welcome).toBeVisible();
 });
 ```
@@ -61,17 +61,17 @@ healingTest('login flow', async ({ healingPage }) => {
 ### Using Healing Page Directly
 
 ```typescript
-import { test } from '@playwright/test';
-import { HealingPage } from '@shifty/playwright-healing';
+import { test } from "@playwright/test";
+import { HealingPage } from "@shifty/playwright-healing";
 
-test('example', async ({ page }) => {
+test("example", async ({ page }) => {
   const healingPage = new HealingPage(page, {
     enabled: true,
-    strategies: ['data-testid-recovery', 'text-content-matching'],
+    strategies: ["data-testid-recovery", "text-content-matching"],
   });
-  
-  await healingPage.goto('https://example.com');
-  await healingPage.click('#broken-selector'); // Will auto-heal
+
+  await healingPage.goto("https://example.com");
+  await healingPage.click("#broken-selector"); // Will auto-heal
 });
 ```
 
@@ -94,7 +94,7 @@ export HEALING_CACHE=true
 
 # Ollama configuration
 export OLLAMA_URL=http://localhost:11434
-export OLLAMA_MODEL=llama3.1:8b
+export OLLAMA_MODEL=qwen2.5-coder:3b
 export OLLAMA_TIMEOUT=30000
 
 # Retry configuration
@@ -116,16 +116,16 @@ Create `healing.config.js` in your project root:
 module.exports = {
   enabled: true,
   strategies: [
-    'data-testid-recovery',
-    'text-content-matching',
-    'css-hierarchy-analysis',
-    'ai-powered-analysis',
+    "data-testid-recovery",
+    "text-content-matching",
+    "css-hierarchy-analysis",
+    "ai-powered-analysis",
   ],
   maxAttempts: 3,
   cacheHealing: true,
   ollama: {
-    url: 'http://localhost:11434',
-    model: 'llama3.1:8b',
+    url: "http://localhost:11434",
+    model: "qwen2.5-coder:3b",
     timeout: 30000,
   },
   retry: {
@@ -136,7 +136,7 @@ module.exports = {
   },
   telemetry: {
     enabled: true,
-    logLevel: 'info',
+    logLevel: "info",
   },
 };
 ```
@@ -144,16 +144,16 @@ module.exports = {
 ### Programmatic Configuration
 
 ```typescript
-import { configureHealing } from '@shifty/playwright-healing';
+import { configureHealing } from "@shifty/playwright-healing";
 
 export const myHealingTest = configureHealing({
   enabled: true,
-  strategies: ['data-testid-recovery', 'text-content-matching'],
+  strategies: ["data-testid-recovery", "text-content-matching"],
   maxAttempts: 5,
   cacheHealing: true,
 });
 
-myHealingTest('custom test', async ({ healingPage }) => {
+myHealingTest("custom test", async ({ healingPage }) => {
   // Your test here
 });
 ```
@@ -163,12 +163,14 @@ myHealingTest('custom test', async ({ healingPage }) => {
 ### 1. Data-testid Recovery
 
 Scans the page for elements with test ID attributes and finds matches using:
+
 - Exact matches (case-insensitive)
 - Normalized matches (handles kebab-case, snake_case, camelCase)
 - Substring matches
 - Levenshtein distance similarity
 
 **Example:**
+
 ```typescript
 // Broken: [data-testid="submit-btn-old"]
 // Heals to: [data-testid="submit-button"]
@@ -178,12 +180,14 @@ await healingPage.click('[data-testid="submit-btn-old"]');
 ### 2. Text Content Matching
 
 Finds elements by their visible text using:
+
 - Exact text matches
 - Fuzzy matching (>80% similarity)
 - Word overlap for longer texts
 - Multiple selector formats (text=, :has-text(), aria-label)
 
 **Example:**
+
 ```typescript
 // Broken: text="Submit Form"
 // Heals to: button:has-text("Submit")
@@ -193,33 +197,39 @@ await healingPage.click('text="Submit Form"');
 ### 3. CSS Hierarchy Analysis
 
 Analyzes DOM structure and suggests alternatives:
+
 - Removes brittle parts (IDs, nth-child)
 - Simplifies deep hierarchies
 - Uses class-only selectors
 - Tries parent-child relationships
 
 **Example:**
+
 ```typescript
 // Broken: div#app > main.content > section:nth-child(3) > button#submit
 // Heals to: button.submit-btn
-await healingPage.click('div#app > main.content > section:nth-child(3) > button#submit');
+await healingPage.click(
+  "div#app > main.content > section:nth-child(3) > button#submit"
+);
 ```
 
 ### 4. AI-Powered Analysis
 
 Uses Ollama LLM to intelligently suggest selectors:
+
 - Analyzes page structure
 - Prioritizes stable selectors (data-testid, role, text)
 - Avoids auto-generated identifiers
 - Provides reasoning for suggestions
 
 **Requires Ollama running locally:**
+
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull the model
-ollama pull llama3.1:8b
+ollama pull qwen2.5-coder:3b
 
 # Verify it's running
 curl http://localhost:11434/api/tags
@@ -235,10 +245,10 @@ Auto-healing wrapper around Playwright's Page.
 class HealingPage {
   // Get a locator with auto-healing
   async locator(selector: string, options?: { timeout?: number }): Promise<Locator>
-  
+
   // Navigation
   async goto(url: string, options?: GotoOptions): Promise<Response>
-  
+
   // Actions with auto-healing
   async click(selector: string, options?: ClickOptions): Promise<void>
   async fill(selector: string, value: string, options?: FillOptions): Promise<void>
@@ -246,7 +256,7 @@ class HealingPage {
   async selectOption(selector: string, values: string | string[], options?): Promise<string[]>
   async check(selector: string, options?: CheckOptions): Promise<void>
   async uncheck(selector: string, options?: UncheckOptions): Promise<void>
-  
+
   // Utilities
   getPage(): Page
   getEngine(): HealingEngine
@@ -262,16 +272,16 @@ Core healing logic orchestrator.
 ```typescript
 class HealingEngine {
   constructor(config?: HealingConfig)
-  
+
   // Heal a broken selector
   async heal(page: Page, brokenSelector: string, options?: HealingStrategyOptions): Promise<HealingResult>
-  
+
   // Health check
   async healthCheck(page?: Page): Promise<{ status: string; strategies: Record<...>; cache: {...} }>
-  
+
   // Statistics
   getFlakinessStats(): Array<{ selector: string; successes: number; failures: number; flakinessScore: number }>
-  
+
   // Cache management
   clearCache(): void
   updateConfig(config: Partial<HealingConfig>): void
@@ -284,18 +294,21 @@ Handles intelligent retries for timeouts and flakiness.
 
 ```typescript
 class RetryHandler {
-  constructor(config?: HealingConfig)
-  
+  constructor(config?: HealingConfig);
+
   // Execute action with retry
-  async withRetry<T>(action: () => Promise<T>, options?: RetryOptions): Promise<T>
-  
+  async withRetry<T>(
+    action: () => Promise<T>,
+    options?: RetryOptions
+  ): Promise<T>;
+
   // Execute Playwright action with healing and retry
   async executeWithHealing<T>(
     page: Page,
     selector: string,
     action: (locator: Locator) => Promise<T>,
     options?: RetryOptions
-  ): Promise<T>
+  ): Promise<T>;
 }
 ```
 
@@ -304,16 +317,16 @@ class RetryHandler {
 ### Example 1: Login Flow with Healing
 
 ```typescript
-import { healingTest, expect } from '@shifty/playwright-healing';
+import { healingTest, expect } from "@shifty/playwright-healing";
 
-healingTest('user can log in', async ({ healingPage }) => {
-  await healingPage.goto('https://myapp.com/login');
-  
+healingTest("user can log in", async ({ healingPage }) => {
+  await healingPage.goto("https://myapp.com/login");
+
   // Even if selectors change, healing will fix them
-  await healingPage.fill('[data-testid="email-input"]', 'user@example.com');
-  await healingPage.fill('[data-testid="password-input"]', 'password123');
+  await healingPage.fill('[data-testid="email-input"]', "user@example.com");
+  await healingPage.fill('[data-testid="password-input"]', "password123");
   await healingPage.click('[data-testid="login-button"]');
-  
+
   // Verify redirect
   await expect(healingPage.getPage()).toHaveURL(/.*dashboard/);
 });
@@ -322,24 +335,24 @@ healingTest('user can log in', async ({ healingPage }) => {
 ### Example 2: E-commerce Checkout
 
 ```typescript
-healingTest('complete purchase', async ({ healingPage }) => {
-  await healingPage.goto('https://shop.example.com/cart');
-  
+healingTest("complete purchase", async ({ healingPage }) => {
+  await healingPage.goto("https://shop.example.com/cart");
+
   // Add items - selectors will auto-heal
   await healingPage.click('text="Add to Cart"');
-  await healingPage.click('.checkout-button');
-  
+  await healingPage.click(".checkout-button");
+
   // Fill shipping form
-  await healingPage.fill('#shipping-name', 'John Doe');
-  await healingPage.fill('#shipping-address', '123 Main St');
+  await healingPage.fill("#shipping-name", "John Doe");
+  await healingPage.fill("#shipping-address", "123 Main St");
   await healingPage.click('button:has-text("Continue to Payment")');
-  
+
   // Complete payment
-  await healingPage.fill('[data-testid="card-number"]', '4242424242424242');
+  await healingPage.fill('[data-testid="card-number"]', "4242424242424242");
   await healingPage.click('text="Complete Order"');
-  
+
   // Verify success
-  const confirmation = await healingPage.locator('.order-confirmation');
+  const confirmation = await healingPage.locator(".order-confirmation");
   await expect(confirmation).toBeVisible();
 });
 ```
@@ -347,17 +360,17 @@ healingTest('complete purchase', async ({ healingPage }) => {
 ### Example 3: Custom Healing Strategy
 
 ```typescript
-import { HealingEngine } from '@shifty/playwright-healing';
+import { HealingEngine } from "@shifty/playwright-healing";
 
 const engine = new HealingEngine({
-  strategies: ['data-testid-recovery', 'text-content-matching'], // Skip AI
+  strategies: ["data-testid-recovery", "text-content-matching"], // Skip AI
   maxAttempts: 5,
   cacheHealing: true,
 });
 
-test('with custom engine', async ({ page }) => {
-  const result = await engine.heal(page, '#broken-selector');
-  
+test("with custom engine", async ({ page }) => {
+  const result = await engine.heal(page, "#broken-selector");
+
   if (result.success) {
     console.log(`Healed: ${result.selector}`);
     console.log(`Strategy: ${result.strategy}`);
@@ -369,9 +382,9 @@ test('with custom engine', async ({ page }) => {
 ### Example 4: Retry Handler
 
 ```typescript
-import { RetryHandler } from '@shifty/playwright-healing';
+import { RetryHandler } from "@shifty/playwright-healing";
 
-test('with retry handler', async ({ page }) => {
+test("with retry handler", async ({ page }) => {
   const handler = new RetryHandler({
     retry: {
       onTimeout: true,
@@ -380,11 +393,11 @@ test('with retry handler', async ({ page }) => {
       initialBackoff: 2000,
     },
   });
-  
+
   // Action will retry on timeout/flakiness
   await handler.executeWithHealing(
     page,
-    '#flaky-button',
+    "#flaky-button",
     async (locator) => {
       await locator.click();
     },
@@ -405,18 +418,21 @@ test('with retry handler', async ({ page }) => {
 If AI-powered healing fails:
 
 1. **Check if Ollama is running:**
+
    ```bash
    curl http://localhost:11434/api/tags
    ```
 
 2. **Start Ollama:**
+
    ```bash
    ollama serve
    ```
 
 3. **Pull the model:**
+
    ```bash
-   ollama pull llama3.1:8b
+   ollama pull qwen2.5-coder:3b
    ```
 
 4. **Configure URL if using remote Ollama:**
@@ -427,26 +443,32 @@ If AI-powered healing fails:
 ### Healing Not Working
 
 1. **Enable debug logging:**
+
    ```bash
    export LOG_LEVEL=debug
    ```
 
 2. **Check healing statistics:**
+
    ```typescript
    const stats = healingPage.getHealingStats();
-   console.log('Healing attempts:', stats.attempts);
-   console.log('Flakiness:', stats.flakiness);
+   console.log("Healing attempts:", stats.attempts);
+   console.log("Flakiness:", stats.flakiness);
    ```
 
 3. **Verify configuration:**
+
    ```typescript
-   import { validateConfig, loadHealingConfig } from '@shifty/playwright-healing';
-   
+   import {
+     validateConfig,
+     loadHealingConfig,
+   } from "@shifty/playwright-healing";
+
    const config = loadHealingConfig();
    const validation = validateConfig(config);
-   
+
    if (!validation.valid) {
-     console.error('Config errors:', validation.errors);
+     console.error("Config errors:", validation.errors);
    }
    ```
 
@@ -499,6 +521,7 @@ MIT License - see [LICENSE](LICENSE) file for details
 ## ⭐ Support
 
 If you find this package useful, please consider:
+
 - ⭐ Starring the repository
 - 🐛 Reporting issues
 - 💡 Suggesting features

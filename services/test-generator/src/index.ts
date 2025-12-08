@@ -164,12 +164,38 @@ class TestGeneratorService {
   }
 
   private async registerRoutes() {
-    // Minimal health endpoint for load balancers
-    fastify.get("/health", async () => {
+    // Secured health endpoint - minimal public info
+    fastify.get('/health', async () => {
       return {
-        status: "healthy",
-        timestamp: new Date().toISOString(),
+        status: 'healthy',
+        timestamp: new Date().toISOString()
       };
+    });
+
+    // Detailed health check - for internal monitoring
+    fastify.get('/health/detailed', async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Authentication required' });
+        }
+
+        const token = authHeader.substring(7);
+        jwt.verify(token, jwtConfig.secret);
+
+        const aiHealth = await this.testGenerator.healthCheck();
+        
+        return {
+          status: aiHealth.status === 'healthy' ? 'healthy' : 'degraded',
+          service: 'test-generator',
+          version: process.env.SERVICE_VERSION || '1.0.0',
+          ai: aiHealth,
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime()
+        };
+      } catch (error) {
+        return reply.status(401).send({ error: 'Invalid authentication' });
+      }
     });
 
     // Generate test from requirements

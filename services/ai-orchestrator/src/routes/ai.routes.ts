@@ -1,3 +1,4 @@
+import { AnalyticsService } from '../services/analytics.service.js';
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { OllamaService } from "../services/ollama.service.js";
@@ -45,9 +46,10 @@ export async function aiRoutes(
     testGenerationService: TestGenerationService;
     healingService: SelectorHealingService;
     ollamaService: OllamaService;
+    analyticsService: AnalyticsService;
   }
 ) {
-  const { testGenerationService, healingService, ollamaService } = options;
+  const { testGenerationService, healingService, ollamaService, analyticsService } = options;
 
   // Test Generation Routes
   fastify.post("/api/v1/ai/generate-test", async (request, reply) => {
@@ -269,31 +271,19 @@ export async function aiRoutes(
   // AI Analytics and Insights
   fastify.get("/api/v1/ai/analytics", async (request, reply) => {
     try {
-      const tenantId = request.headers["x-tenant-id"] as string;
+      const tenantId = request.headers['x-tenant-id'] as string;
+      const databaseUrl = request.headers['x-database-url'] as string;
+
       if (!tenantId) {
         return reply.status(401).send({ error: "Tenant ID required" });
       }
 
-      // Analytics with placeholder data - real data requires aggregation from test-generator and healing-engine
-      const analytics = {
-        testGeneration: {
-          totalGenerated: 0,
-          successRate: 0.85,
-          averageConfidence: 0.78,
-          mostUsedTypes: ["e2e", "smoke", "integration"],
-        },
-        selectorHealing: {
-          totalAttempts: 0,
-          healingSuccessRate: 0.72,
-          averageConfidence: 0.68,
-          mostUsedStrategies: ["extract-testid", "role-based", "ai-generated"],
-        },
-        modelUsage: {
-          totalRequests: 0,
-          averageResponseTime: 2500,
-          currentModel: process.env.AI_MODEL || "llama3.1",
-        },
-      };
+      if (!databaseUrl) {
+        return reply.status(400).send({ error: 'Database URL required' });
+      }
+
+      // Get real analytics from the database
+      const analytics = await analyticsService.getAnalytics(tenantId, databaseUrl);
 
       reply.send({
         success: true,

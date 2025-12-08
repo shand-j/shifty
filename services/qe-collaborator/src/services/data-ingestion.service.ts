@@ -81,9 +81,40 @@ export class DataIngestionService {
    */
   private async ingestTestData(tenantId: string): Promise<KnowledgeDocument[]> {
     try {
-      // Test data ingestion requires integration with test-generator service
-      // Return empty array until service endpoint is available
-      return [];
+      // Fetch test generation data from test-generator service
+      const testGeneratorUrl = process.env.TEST_GENERATOR_URL || 'http://localhost:3004';
+      const response = await fetch(`${testGeneratorUrl}/api/v1/tests/history?tenantId=${tenantId}`, {
+        method: 'GET',
+        headers: {
+          'X-Tenant-Id': tenantId,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch test data from test-generator: ${response.status}`);
+        return [];
+      }
+
+      const testData = await response.json() as any;
+      
+      // Convert test data to knowledge documents
+      const documents: KnowledgeDocument[] = testData.tests?.map((test: any) => ({
+        id: test.id,
+        type: 'test-execution' as const,
+        content: `Test: ${test.name}\nType: ${test.type}\nStatus: ${test.status}\nGenerated: ${test.createdAt}`,
+        metadata: {
+          testId: test.id,
+          testType: test.type,
+          status: test.status,
+          framework: test.framework
+        },
+        embeddings: [],
+        createdAt: new Date(test.createdAt),
+        updatedAt: new Date()
+      })) || [];
+
+      return documents;
     } catch (error) {
       console.error("Error ingesting test data:", error);
       return [];

@@ -1,5 +1,16 @@
-import { DatabaseManager, HealingAttemptsRepository } from "@shifty/database";
-import {
+import Fastify from 'fastify';
+import { DatabaseManager, HealingAttemptsRepository, HealingAttemptRecord } from '@shifty/database';
+import { SelectorHealer, HealingResult as CoreHealingResult } from './core/selector-healer.js';
+import { BrowserPool } from './core/browser-pool.js';
+import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
+import { chromium, firefox, webkit, Browser, Page } from 'playwright';
+import jwt from 'jsonwebtoken';
+import { 
+  getJwtConfig, 
+  validateProductionConfig,
+  RequestLimits,
+  HealSelectorRequestSchema,
   BatchHealRequestSchema,
   getJwtConfig,
   HealSelectorRequestSchema,
@@ -91,11 +102,7 @@ class HealingEngineService {
   private dbManager: DatabaseManager;
   private selectorHealer: SelectorHealer;
   private healingRepo: HealingAttemptsRepository;
-  private browserPool: Map<string, { browser: Browser; lastUsed: number }> =
-    new Map();
-  private readonly MAX_BROWSERS = 10;
-  private readonly BROWSER_IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
-  private cleanupInterval: NodeJS.Timeout | null = null;
+  private browserPool: BrowserPool;
   // Configuration for tenant database URLs - in production, this would come from tenant manager
   private tenantDbUrlTemplate: string;
 
@@ -106,7 +113,9 @@ class HealingEngineService {
       ollamaUrl: process.env.OLLAMA_URL || "http://localhost:11434",
       model: process.env.AI_MODEL || "llama3.1",
     });
-
+    // Initialize browser pool with max 10 browsers, 5 minute TTL
+    this.browserPool = new BrowserPool(10, 5);
+    
     // Template for tenant database URLs
     // In production, TENANT_DB_URL_TEMPLATE must be configured
     if (
@@ -178,12 +187,40 @@ class HealingEngineService {
   }
 
   private async registerRoutes() {
-    // Minimal health endpoint for load balancers
-    fastify.get("/health", async () => {
+    // Secured health endpoint - minimal public info
+    fastify.get('/health', async () => {
       return {
-        status: "healthy",
-        timestamp: new Date().toISOString(),
+        status: 'healthy',
+        timestamp: new Date().toISOString()
       };
+    });
+
+    // Detailed health check - for internal monitoring
+    fastify.get('/health/detailed', async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Authentication required' });
+        }
+
+        const token = authHeader.substring(7);
+        jwt.verify(token, jwtConfig.secret);
+
+        const healerHealth = await this.selectorHealer.healthCheck();
+        const browserStats = this.browserPool.getStats();
+        
+        return {
+          status: healerHealth.status,
+          service: 'healing-engine',
+          version: process.env.SERVICE_VERSION || '1.0.0',
+          healer: healerHealth,
+          browserPool: browserStats,
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime()
+        };
+      } catch (error) {
+        return reply.status(401).send({ error: 'Invalid authentication' });
+      }
     });
 
     // Helper function to extract tenant from JWT
@@ -222,15 +259,12 @@ class HealingEngineService {
 
         const startTime = Date.now();
 
-        // Mock healing for test environment example.com URLs
-        if (
-          process.env.NODE_ENV === "test" &&
-          body.url.includes("example.com")
-        ) {
-          const mockHealingResult = this.getMockHealingResult(
-            body.brokenSelector,
-            body.strategy
-          );
+        // Only use mock healing in test/development environments for specific test URLs
+        const shouldUseMock = (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') && 
+                             body.url.includes('example.com');
+        
+        if (shouldUseMock) {
+          const mockHealingResult = this.getMockHealingResult(body.brokenSelector, body.strategy);
           const executionTime = Date.now() - startTime;
 
           await this.logHealingAttempt(tenantId, {
@@ -264,9 +298,7 @@ class HealingEngineService {
           return reply.send(result);
         }
 
-        const browser = await this.getBrowser(
-          body.context?.browserType || "chromium"
-        );
+        const browser = await this.browserPool.getBrowser(body.context?.browserType || 'chromium');
         const page = await browser.newPage();
 
         try {
@@ -323,7 +355,8 @@ class HealingEngineService {
           reply.send(result);
         } finally {
           await page.close();
-          await browser.close();
+          // Release browser back to pool instead of closing it
+          await this.browserPool.releaseBrowser(browser);
         }
       } catch (error) {
         console.error("Selector healing error:", error);
@@ -649,70 +682,9 @@ class HealingEngineService {
     });
   }
 
-  private async getBrowser(browserType: "chromium" | "firefox" | "webkit") {
-    const poolKey = browserType;
-
-    // Check if browser exists and is not too old
-    const pooled = this.browserPool.get(poolKey);
-    if (pooled && Date.now() - pooled.lastUsed < this.BROWSER_IDLE_TIMEOUT) {
-      pooled.lastUsed = Date.now();
-      return pooled.browser;
-    }
-
-    // Close old browser if it exists
-    if (pooled) {
-      try {
-        await pooled.browser.close();
-      } catch {
-        /* Ignore close errors */
-      }
-      this.browserPool.delete(poolKey);
-    }
-
-    // Enforce max browsers limit
-    if (this.browserPool.size >= this.MAX_BROWSERS) {
-      const oldestKey = Array.from(this.browserPool.entries()).sort(
-        (a, b) => a[1].lastUsed - b[1].lastUsed
-      )[0][0];
-      const oldest = this.browserPool.get(oldestKey);
-      if (oldest) {
-        try {
-          await oldest.browser.close();
-        } catch {
-          /* Ignore close errors */
-        }
-        this.browserPool.delete(oldestKey);
-      }
-    }
-
-    // Launch new browser
-    let browser: Browser;
-    switch (browserType) {
-      case "firefox":
-        browser = await firefox.launch({ headless: true });
-        break;
-      case "webkit":
-        browser = await webkit.launch({ headless: true });
-        break;
-      default:
-        browser = await chromium.launch({ headless: true });
-    }
-
-    this.browserPool.set(poolKey, { browser, lastUsed: Date.now() });
-    return browser;
-  }
-
-  private cleanupIdleBrowsers() {
-    const now = Date.now();
-    for (const [key, pooled] of this.browserPool.entries()) {
-      if (now - pooled.lastUsed > this.BROWSER_IDLE_TIMEOUT) {
-        pooled.browser.close().catch(() => {
-          /* Ignore */
-        });
-        this.browserPool.delete(key);
-        console.log(`Closed idle browser: ${key}`);
-      }
-    }
+  private async getBrowser(browserType: 'chromium' | 'firefox' | 'webkit') {
+    // Use browser pool instead of creating new browsers
+    return await this.browserPool.getBrowser(browserType);
   }
 
   private async closeAllBrowsers() {
@@ -865,7 +837,8 @@ class HealingEngineService {
   }
 
   async stop() {
-    await this.closeAllBrowsers();
+    // Close browser pool first
+    await this.browserPool.closeAll();
     await this.dbManager.close();
     await fastify.close();
     console.log("Healing Engine Service stopped");

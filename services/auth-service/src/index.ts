@@ -1,14 +1,10 @@
-import { DatabaseManager } from "@shifty/database";
-import {
-  getJwtConfig,
-  getTenantDatabaseUrl,
-  RequestLimits,
-  validateProductionConfig,
-} from "@shifty/shared";
-import bcrypt from "bcrypt";
-import Fastify from "fastify";
-import jwt from "jsonwebtoken";
-import { z } from "zod";
+import Fastify from 'fastify';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { DatabaseManager } from '@shifty/database';
+import { z } from 'zod';
+import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl, RequestLimits } from '@shifty/shared';
+import { AuthErrorCode, ErrorResponse, generateCorrelationId } from './errors.js';
 
 // Validate configuration on startup
 try {
@@ -103,12 +99,40 @@ class AuthService {
   }
 
   private async registerRoutes() {
-    // Minimal health endpoint for load balancers (no sensitive info)
-    fastify.get("/health", async () => {
+    // Secured health endpoint - minimal public info, detailed info requires auth
+    fastify.get('/health', async (request, reply) => {
+      // Public health check - minimal information
       return {
-        status: "healthy",
-        timestamp: new Date().toISOString(),
+        status: 'healthy',
+        timestamp: new Date().toISOString()
       };
+    });
+
+    // Detailed health check - requires authentication
+    fastify.get('/health/detailed', async (request, reply) => {
+      try {
+        // Verify JWT token
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Authentication required' });
+        }
+
+        const token = authHeader.substring(7);
+        jwt.verify(token, this.jwtSecret);
+
+        // Return detailed health information
+        const dbHealth = await this.dbManager.healthCheck();
+        return {
+          status: 'healthy',
+          service: 'auth-service',
+          version: process.env.SERVICE_VERSION || '1.0.0',
+          timestamp: new Date().toISOString(),
+          database: dbHealth,
+          uptime: process.uptime()
+        };
+      } catch (error) {
+        return reply.status(401).send({ error: 'Invalid authentication' });
+      }
     });
 
     // Register new user and tenant
@@ -153,21 +177,32 @@ class AuthService {
           tenant: result.tenant,
         });
       } catch (error) {
-        const correlationId = `reg-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-        console.error(`[${correlationId}] Registration error:`, error);
-        if (error instanceof z.ZodError) {
-          return reply.status(400).send({
-            error: "Invalid input",
-            code: "AUTH_001",
-            correlationId,
-            details: error.errors,
-          });
-        }
-        reply.status(500).send({
-          error: "Internal server error",
-          code: "AUTH_002",
-          correlationId,
+        const correlationId = generateCorrelationId();
+        
+        // Log with correlation ID and full context
+        console.error(`[${correlationId}] Registration error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
         });
+
+        if (error instanceof z.ZodError) {
+          const errorResponse = ErrorResponse.create(
+            AuthErrorCode.INVALID_INPUT,
+            'Invalid registration data',
+            correlationId,
+            error.errors
+          );
+          return reply.status(400).send(errorResponse);
+        }
+        
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INTERNAL_ERROR,
+          'Registration failed due to internal error',
+          correlationId,
+          process.env.NODE_ENV === 'development' ? error : undefined
+        );
+        reply.status(500).send(errorResponse);
       }
     });
 
@@ -208,20 +243,32 @@ class AuthService {
           token,
         });
       } catch (error) {
-        const correlationId = `login-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-        console.error(`[${correlationId}] Login error:`, error);
-        if (error instanceof z.ZodError) {
-          return reply.status(400).send({
-            error: "Invalid input",
-            code: "AUTH_003",
-            correlationId,
-          });
-        }
-        reply.status(401).send({
-          error: "Invalid credentials",
-          code: "AUTH_004",
-          correlationId,
+        const correlationId = generateCorrelationId();
+        
+        // Log with correlation ID and full context (without sensitive data)
+        console.error(`[${correlationId}] Login error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
         });
+
+        if (error instanceof z.ZodError) {
+          const errorResponse = ErrorResponse.create(
+            AuthErrorCode.INVALID_INPUT,
+            'Invalid input provided',
+            correlationId,
+            error.errors
+          );
+          return reply.status(400).send(errorResponse);
+        }
+        
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INTERNAL_ERROR,
+          'Login failed due to internal error',
+          correlationId,
+          process.env.NODE_ENV === 'development' ? error : undefined
+        );
+        reply.status(500).send(errorResponse);
       }
     });
 
@@ -254,8 +301,19 @@ class AuthService {
           },
         });
       } catch (error) {
-        console.error("Token verification error:", error);
-        reply.status(401).send({ error: "Invalid token" });
+        const correlationId = generateCorrelationId();
+        
+        console.error(`[${correlationId}] Token verification error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        });
+
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INVALID_TOKEN,
+          'Token verification failed',
+          correlationId
+        );
+        reply.status(401).send(errorResponse);
       }
     });
 

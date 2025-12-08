@@ -1,0 +1,3 @@
+{
+  "/(app)/pipelines/configure/page": "app/(app)/pipelines/configure/page.js"
+}

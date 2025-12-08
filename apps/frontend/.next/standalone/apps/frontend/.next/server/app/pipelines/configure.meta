@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(app)/layout,_N_T_/(app)/pipelines/layout,_N_T_/(app)/pipelines/configure/layout,_N_T_/(app)/pipelines/configure/page,_N_T_/pipelines/configure"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KGFwcCk/pipelines/configure/__PAGE__",
+    "/!KGFwcCk/pipelines/configure",
+    "/!KGFwcCk/pipelines",
+    "/!KGFwcCk",
+    "/_index",
+    "/_head"
+  ]
+}

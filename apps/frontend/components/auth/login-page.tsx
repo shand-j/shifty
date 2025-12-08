@@ -12,11 +12,12 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useAppStore } from "@/lib/store"
 import { ShiftyLogo } from "@/components/logo/shifty-logo"
+import { getAPIClient } from "@/lib/api-client"
 
 export function LoginPage() {
   const router = useRouter()
-  const { setUser } = useAppStore()
-  const [username, setUsername] = useState("")
+  const { setUser, setTenant } = useAppStore()
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,22 +28,33 @@ export function LoginPage() {
     setError("")
     setLoading(true)
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Hardcoded credentials: test / test
-    if (username === "test" && password === "test") {
-      setUser({
-        id: "1",
-        name: "Test User",
-        email: "test@shifty.dev",
-        avatar: "/developer-working.png",
-        persona: "qa",
-        role: "admin",
-      })
-      router.push("/dashboard")
-    } else {
-      setError("Invalid credentials. Use username: test, password: test")
+    try {
+      const apiClient = getAPIClient()
+      const response = await apiClient.login({ email, password })
+      
+      if (response.success && response.user) {
+        setUser(response.user)
+        
+        // Fetch tenant information if available
+        if (response.user.id) {
+          try {
+            const tenantsResponse = await apiClient.getTenants()
+            if (tenantsResponse.success && tenantsResponse.data?.length > 0) {
+              setTenant(tenantsResponse.data[0])
+            }
+          } catch (tenantError) {
+            console.error('Failed to fetch tenant:', tenantError)
+          }
+        }
+        
+        router.push("/dashboard")
+      } else {
+        setError(response.error || "Invalid credentials")
+      }
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError(err.response?.data?.error || err.message || "Login failed. Please try again.")
+    } finally {
       setLoading(false)
     }
   }
@@ -69,14 +81,14 @@ export function LoginPage() {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoComplete="username"
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   required
                 />
               </div>
@@ -191,11 +203,15 @@ export function LoginPage() {
             </p>
 
             {/* Demo credentials hint */}
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
-              <p className="text-xs text-muted-foreground">
-                Demo credentials: <code className="text-primary">test</code> /{" "}
-                <code className="text-primary">test</code>
-              </p>
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground font-medium mb-2">Demo Personas:</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div><code className="text-primary">dev@shifty.ai</code> - Developer</div>
+                <div><code className="text-primary">qa@shifty.ai</code> - QA Engineer</div>
+                <div><code className="text-primary">po@shifty.ai</code> - Product Owner</div>
+                <div><code className="text-primary">manager@shifty.ai</code> - Manager</div>
+                <div className="mt-2 text-[10px]">Password: any (mock mode)</div>
+              </div>
             </div>
           </CardContent>
         </Card>

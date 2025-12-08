@@ -13,6 +13,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@faker-js/faker": "^9.3.0",
     "zod": "^3.22.0",
     "uuid": "^9.0.0",
     "date-fns": "^2.30.0"
@@ -35,6 +36,14 @@
     "./utils": {
       "import": "./dist/utils/index.js",
       "require": "./dist/utils/index.js"
+    },
+    "./mocks/store": {
+      "import": "./dist/mocks/store.js",
+      "require": "./dist/mocks/store.js"
+    },
+    "./mocks/factories": {
+      "import": "./dist/mocks/factories.js",
+      "require": "./dist/mocks/factories.js"
     }
   }
 }

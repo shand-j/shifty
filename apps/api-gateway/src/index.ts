@@ -12,6 +12,7 @@ import {
   safeValidateJwtPayload,
   createValidationErrorResponse
 } from '@shifty/shared';
+import { mockInterceptor } from './middleware/mock-interceptor';
 
 // Validate configuration on startup
 try {
@@ -308,6 +309,66 @@ class APIGateway {
       prefix: '/api/v1/ci',
       target: process.env.CICD_GOVERNOR_URL || 'http://localhost:3012',
       requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/github',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/jira',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/slack',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/sentry',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/datadog',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/jenkins',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/newrelic',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/notion',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/gitlab',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/circleci',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/logs',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/ollama',
+      target: process.env.INTEGRATIONS_URL || 'http://localhost:3013',
+      requiresAuth: true
     }
   ];
 
@@ -366,10 +427,10 @@ class APIGateway {
     }
 
     await fastify.register(cors, {
-      origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:3010'],
+      origin: corsOrigins.length > 0 ? corsOrigins : ['http://localhost:3010', 'http://localhost:3000', 'http://frontend:3000'],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID', 'X-Mock-Mode'],
       exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
       maxAge: 86400 // 24 hours
     });
@@ -424,6 +485,13 @@ class APIGateway {
     await fastify.register(jwt, {
       secret: jwtConfig.secret
     });
+
+    // Register mock interceptor hook
+    const MOCK_MODE = process.env.MOCK_MODE === 'true';
+    if (MOCK_MODE) {
+      console.log('🎭 Mock mode enabled - intercepting API calls');
+      fastify.addHook('preHandler', mockInterceptor);
+    }
   }
 
   private async registerRoutes() {

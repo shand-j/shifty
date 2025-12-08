@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import Redis from 'ioredis';
 import { TenantService } from './services/tenant.service';
 import { tenantRoutes } from './routes/tenant.routes';
 import { DatabaseManager } from '@shifty/database';
@@ -25,6 +27,7 @@ class TenantManagerApp {
   private port: number;
   private tenantService: TenantService;
   private dbManager: DatabaseManager;
+  private redisClient: Redis | null = null;
 
   constructor() {
     this.app = express();
@@ -32,9 +35,42 @@ class TenantManagerApp {
     this.dbManager = new DatabaseManager();
     this.tenantService = new TenantService(this.dbManager);
     
+    this.initializeRedis();
     this.initializeMiddleware();
     this.initializeRoutes();
     this.initializeErrorHandling();
+  }
+
+  private initializeRedis() {
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    
+    try {
+      this.redisClient = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times) => {
+          if (times > 3) {
+            console.error('❌ Redis connection failed after 3 retries, falling back to in-memory rate limiting');
+            return null; // Stop retrying
+          }
+          return Math.min(times * 1000, 3000); // Exponential backoff
+        }
+      });
+
+      this.redisClient.on('connect', () => {
+        console.log('✅ Redis connected for distributed rate limiting');
+      });
+
+      this.redisClient.on('error', (err) => {
+        console.error('⚠️  Redis error:', err.message);
+      });
+
+      this.redisClient.on('close', () => {
+        console.log('⚠️  Redis connection closed');
+      });
+    } catch (error) {
+      console.error('❌ Failed to initialize Redis:', error);
+      this.redisClient = null;
+    }
   }
 
   private initializeMiddleware() {
@@ -53,19 +89,36 @@ class TenantManagerApp {
     // Performance middleware
     this.app.use(compression());
 
-    // HIGH: In-memory rate limiting - doesn't scale
-    // FIXME: Rate limits reset on restart, no distributed state
-    // TODO: Use Redis-backed rate limiting for multi-instance deployments
-    // Effort: 1 day | Priority: HIGH
-    const limiter = rateLimit({
-      windowMs: process.env.NODE_ENV === 'test' ? 1 * 60 * 1000 : 15 * 60 * 1000, // 1 min for test, 15 min for production
-      max: process.env.NODE_ENV === 'test' ? 1000 : 100, // Much more permissive for testing
+    // Redis-backed distributed rate limiting with fallback to in-memory
+    const limiterConfig: any = {
+      windowMs: process.env.NODE_ENV === 'test' ? 1 * 60 * 1000 : 15 * 60 * 1000,
+      max: process.env.NODE_ENV === 'test' ? 1000 : 100,
       message: 'Too many requests from this IP',
-      skip: (req) => {
+      skip: (req: express.Request) => {
         // Exclude health checks from rate limiting
         return req.path === '/health' || req.path === '/api/v1/health';
+      },
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    };
+
+    // Use Redis store if available, otherwise fallback to in-memory
+    if (this.redisClient && this.redisClient.status === 'ready') {
+      try {
+        limiterConfig.store = new RedisStore({
+          // @ts-expect-error - rate-limit-redis expects different Redis client type
+          client: this.redisClient,
+          prefix: 'rl:tenant-manager:',
+        });
+        console.log('✅ Using Redis-backed distributed rate limiting');
+      } catch (error) {
+        console.error('⚠️  Failed to create Redis store, falling back to in-memory:', error);
       }
-    });
+    } else {
+      console.log('⚠️  Redis not available, using in-memory rate limiting (not suitable for production)');
+    }
+
+    const limiter = rateLimit(limiterConfig);
     this.app.use(limiter);
 
     // Body parsing with centralized request limits
@@ -111,8 +164,18 @@ class TenantManagerApp {
   }
 
   public async stop() {
+    console.log('Shutting down Tenant Manager...');
+    
+    // Close Redis connection
+    if (this.redisClient) {
+      await this.redisClient.quit();
+      console.log('✅ Redis connection closed');
+    }
+    
+    // Close database connections
     await this.dbManager.close();
-    console.log('Tenant Manager service stopped');
+    
+    console.log('✅ Tenant Manager service stopped');
   }
 }
 

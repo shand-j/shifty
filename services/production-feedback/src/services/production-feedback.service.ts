@@ -319,8 +319,8 @@ test.describe('Regression: ${cluster.errorType}', () => {
     // Verify error does not occur
     await expect(page.locator('body')).not.toContainText('${cluster.errorType}');
     
-    // Check for successful page load
-    await expect(page).toHaveTitle(/.+/);
+    // Check for successful page load (more specific title validation)
+    await expect(page).toHaveTitle(/\\S+/);
   });
 });
 `,

@@ -145,8 +145,8 @@ class TenantManagerApp {
     // Use Redis store if available, otherwise fallback to in-memory
     if (this.redisClient && this.redisClient.status === 'ready') {
       try {
-        limiterConfig.store = new RedisStore({
-          // @ts-expect-error - rate-limit-redis expects different Redis client type
+        // Type assertion needed due to library interface mismatch
+        limiterConfig.store = new (RedisStore as any)({
           client: this.redisClient,
           prefix: 'rl:tenant-manager:',
         });

@@ -99,7 +99,11 @@ class QECollaboratorServer {
         console.log('Running scheduled data ingestion...');
         
         // Fetch tenant IDs from database
-        const tenants = await this.dbManager.query('SELECT id FROM tenants WHERE is_active = true LIMIT 10');
+        const tenantLimit = parseInt(process.env.INGESTION_TENANT_LIMIT || '10', 10);
+        const tenants = await this.dbManager.query(
+          'SELECT id FROM tenants WHERE is_active = true LIMIT $1',
+          [tenantLimit]
+        );
         const tenantIds = tenants.rows.map((row: any) => row.id);
         
         if (tenantIds.length > 0) {

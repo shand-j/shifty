@@ -43,7 +43,8 @@ export class BrowserPool {
     console.log(`🚀 Creating new ${browserType} browser (${this.pool.size + 1}/${this.maxSize})`);
     const browser = await this.launchBrowser(browserType);
     
-    const id = `${browserType}-${Date.now()}-${Math.random()}`;
+    // Use crypto.randomUUID for guaranteed uniqueness
+    const id = `${browserType}-${Date.now()}-${crypto.randomUUID()}`;
     this.pool.set(id, {
       browser,
       type: browserType,

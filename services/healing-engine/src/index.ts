@@ -231,9 +231,11 @@ class HealingEngineService {
 
         const startTime = Date.now();
 
-        // TODO: Remove mock path in production - this is for testing only
-        // Mock healing logic for test environment
-        if (process.env.NODE_ENV === 'test' && body.url.includes('example.com')) {
+        // Only use mock healing in test/development environments for specific test URLs
+        const shouldUseMock = (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') && 
+                             body.url.includes('example.com');
+        
+        if (shouldUseMock) {
           const mockHealingResult = this.getMockHealingResult(body.brokenSelector, body.strategy);
           const executionTime = Date.now() - startTime;
 

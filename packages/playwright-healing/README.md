@@ -6,6 +6,10 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![Playwright](https://img.shields.io/badge/playwright-%3E%3D1.40.0-green.svg)](https://playwright.dev)
 
+## 🐍 Looking for Python?
+
+**This package is for Node.js/TypeScript users.** If you're working in Python (especially for AI/ML work), check out the [Python version](../playwright-healing-python/) which is specifically designed for the Python ecosystem.
+
 ## 🚀 Features
 
 - **🔧 Automatic Selector Healing**: Automatically fixes broken selectors without manual intervention

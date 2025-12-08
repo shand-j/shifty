@@ -3,6 +3,7 @@ import { DatabaseManager } from '@shifty/database';
 import { OllamaService } from './services/ollama.service';
 import { TestGenerationService } from './services/test-generation.service';
 import { SelectorHealingService } from './services/selector-healing.service';
+import { AnalyticsService } from './services/analytics.service';
 import { aiRoutes } from './routes/ai.routes';
 
 const fastify = Fastify({
@@ -16,12 +17,14 @@ class AIOrchestrator {
   private ollamaService: OllamaService;
   private testGenerationService: TestGenerationService;
   private healingService: SelectorHealingService;
+  private analyticsService: AnalyticsService;
 
   constructor() {
     this.dbManager = new DatabaseManager();
     this.ollamaService = new OllamaService();
     this.testGenerationService = new TestGenerationService(this.ollamaService, this.dbManager);
     this.healingService = new SelectorHealingService(this.ollamaService, this.dbManager);
+    this.analyticsService = new AnalyticsService(this.dbManager);
   }
 
   async start() {
@@ -79,7 +82,8 @@ class AIOrchestrator {
     await fastify.register(aiRoutes, {
       testGenerationService: this.testGenerationService,
       healingService: this.healingService,
-      ollamaService: this.ollamaService
+      ollamaService: this.ollamaService,
+      analyticsService: this.analyticsService
     });
   }
 

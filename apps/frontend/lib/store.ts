@@ -3,6 +3,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { User, Tenant, Notification } from "./types"
+import { getAPIClient } from "./api-client"
 
 interface AppState {
   user: User | null
@@ -13,6 +14,7 @@ interface AppState {
   sidebarCollapsed: boolean
   commandPaletteOpen: boolean
   notifications: Notification[]
+  loading: boolean
   setUser: (user: User | null) => void
   setTenant: (tenant: Tenant | null) => void
   setToken: (token: string | null) => void

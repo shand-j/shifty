@@ -222,6 +222,7 @@ services:
       - MANUAL_SESSION_HUB_URL=http://manual-session-hub:3019
       - HITL_ARCADE_URL=http://hitl-arcade:3011
       - CICD_GOVERNOR_URL=http://cicd-governor:3012
+      - INTEGRATIONS_URL=http://integrations:3014
       # Security
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
       - REDIS_URL=redis://redis:6379
@@ -251,6 +252,8 @@ services:
       hitl-arcade:
         condition: service_started
       cicd-governor:
+        condition: service_started
+      integrations:
         condition: service_started
     networks:
       - shifty-network
@@ -410,6 +413,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3014
+      - MOCK_MODE=true
       - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
       - PRODUCTION_FEEDBACK_URL=http://production-feedback:3013
       - WEBHOOK_BASE_URL=${WEBHOOK_BASE_URL:-http://localhost:3014}

@@ -1,24 +1,25 @@
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import helmet from '@fastify/helmet';
-import rateLimit from '@fastify/rate-limit';
-import proxy from '@fastify/http-proxy';
-import jwt from '@fastify/jwt';
-import Redis from 'ioredis';
-import { 
-  getJwtConfig, 
-  validateProductionConfig,
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import proxy from "@fastify/http-proxy";
+import jwt from "@fastify/jwt";
+import rateLimit from "@fastify/rate-limit";
+import {
+  createValidationErrorResponse,
+  getJwtConfig,
   RequestLimits,
   safeValidateJwtPayload,
-  createValidationErrorResponse
-} from '@shifty/shared';
+  validateProductionConfig,
+} from "@shifty/shared";
+import Fastify from "fastify";
+import Redis from "ioredis";
+import { mockInterceptor } from "./middleware/mock-interceptor";
 
 // Validate configuration on startup
 try {
   validateProductionConfig();
 } catch (error) {
-  console.error('Configuration validation failed:', error);
-  if (process.env.NODE_ENV === 'production') {
+  console.error("Configuration validation failed:", error);
+  if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 }
@@ -26,10 +27,10 @@ try {
 // Configure Fastify with proper request limits to prevent DoS attacks
 const fastify = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL || 'info'
+    level: process.env.LOG_LEVEL || "info",
   },
   bodyLimit: RequestLimits.bodyLimit, // 1MB limit for JSON requests
-  requestTimeout: RequestLimits.requestTimeout // 30 seconds timeout
+  requestTimeout: RequestLimits.requestTimeout, // 30 seconds timeout
 });
 
 interface ServiceRoute {
@@ -43,7 +44,7 @@ interface ServiceRoute {
 // ============================================================
 
 interface CircuitBreakerState {
-  state: 'closed' | 'open' | 'half-open';
+  state: "closed" | "open" | "half-open";
   failureCount: number;
   successCount: number;
   lastFailureTime: number;
@@ -56,11 +57,13 @@ class CircuitBreaker {
   private readonly resetTimeout: number;
   private readonly halfOpenSuccessThreshold: number;
 
-  constructor(options: {
-    failureThreshold?: number;
-    resetTimeout?: number;
-    halfOpenSuccessThreshold?: number;
-  } = {}) {
+  constructor(
+    options: {
+      failureThreshold?: number;
+      resetTimeout?: number;
+      halfOpenSuccessThreshold?: number;
+    } = {}
+  ) {
     this.failureThreshold = options.failureThreshold || 5;
     this.resetTimeout = options.resetTimeout || 30000; // 30 seconds
     this.halfOpenSuccessThreshold = options.halfOpenSuccessThreshold || 2;
@@ -69,11 +72,11 @@ class CircuitBreaker {
   getState(serviceName: string): CircuitBreakerState {
     if (!this.circuits.has(serviceName)) {
       this.circuits.set(serviceName, {
-        state: 'closed',
+        state: "closed",
         failureCount: 0,
         successCount: 0,
         lastFailureTime: 0,
-        nextAttemptTime: 0
+        nextAttemptTime: 0,
       });
     }
     return this.circuits.get(serviceName)!;
@@ -81,37 +84,37 @@ class CircuitBreaker {
 
   canAttempt(serviceName: string): boolean {
     const circuit = this.getState(serviceName);
-    
-    if (circuit.state === 'closed') {
+
+    if (circuit.state === "closed") {
       return true;
     }
-    
-    if (circuit.state === 'open') {
+
+    if (circuit.state === "open") {
       // Check if we should transition to half-open
       if (Date.now() >= circuit.nextAttemptTime) {
-        circuit.state = 'half-open';
+        circuit.state = "half-open";
         circuit.successCount = 0;
         console.log(`🔄 Circuit for ${serviceName} transitioning to half-open`);
         return true;
       }
       return false;
     }
-    
+
     // half-open state - allow the request
     return true;
   }
 
   recordSuccess(serviceName: string): void {
     const circuit = this.getState(serviceName);
-    
-    if (circuit.state === 'half-open') {
+
+    if (circuit.state === "half-open") {
       circuit.successCount++;
       if (circuit.successCount >= this.halfOpenSuccessThreshold) {
-        circuit.state = 'closed';
+        circuit.state = "closed";
         circuit.failureCount = 0;
         console.log(`✅ Circuit for ${serviceName} closed - service recovered`);
       }
-    } else if (circuit.state === 'closed') {
+    } else if (circuit.state === "closed") {
       // Reset failure count on success
       circuit.failureCount = Math.max(0, circuit.failureCount - 1);
     }
@@ -121,16 +124,23 @@ class CircuitBreaker {
     const circuit = this.getState(serviceName);
     circuit.failureCount++;
     circuit.lastFailureTime = Date.now();
-    
-    if (circuit.state === 'half-open') {
+
+    if (circuit.state === "half-open") {
       // Immediately open circuit on failure during half-open
-      circuit.state = 'open';
+      circuit.state = "open";
       circuit.nextAttemptTime = Date.now() + this.resetTimeout;
-      console.log(`🔴 Circuit for ${serviceName} opened - half-open test failed`);
-    } else if (circuit.state === 'closed' && circuit.failureCount >= this.failureThreshold) {
-      circuit.state = 'open';
+      console.log(
+        `🔴 Circuit for ${serviceName} opened - half-open test failed`
+      );
+    } else if (
+      circuit.state === "closed" &&
+      circuit.failureCount >= this.failureThreshold
+    ) {
+      circuit.state = "open";
       circuit.nextAttemptTime = Date.now() + this.resetTimeout;
-      console.log(`🔴 Circuit for ${serviceName} opened - failure threshold reached`);
+      console.log(
+        `🔴 Circuit for ${serviceName} opened - failure threshold reached`
+      );
     }
   }
 
@@ -165,31 +175,33 @@ class MetricsCollector {
     requests: {
       total: 0,
       byStatus: {},
-      byService: {}
+      byService: {},
     },
     latency: {
       samples: [],
-      sum: 0
+      sum: 0,
     },
-    startTime: Date.now()
+    startTime: Date.now(),
   };
 
   private readonly maxSamples = 1000;
 
   recordRequest(service: string, statusCode: number, latencyMs: number): void {
     this.metrics.requests.total++;
-    
+
     // Track by status code
     const statusKey = String(statusCode);
-    this.metrics.requests.byStatus[statusKey] = (this.metrics.requests.byStatus[statusKey] || 0) + 1;
-    
+    this.metrics.requests.byStatus[statusKey] =
+      (this.metrics.requests.byStatus[statusKey] || 0) + 1;
+
     // Track by service
-    this.metrics.requests.byService[service] = (this.metrics.requests.byService[service] || 0) + 1;
-    
+    this.metrics.requests.byService[service] =
+      (this.metrics.requests.byService[service] || 0) + 1;
+
     // Track latency (keep rolling window)
     this.metrics.latency.samples.push(latencyMs);
     this.metrics.latency.sum += latencyMs;
-    
+
     if (this.metrics.latency.samples.length > this.maxSamples) {
       const removed = this.metrics.latency.samples.shift()!;
       this.metrics.latency.sum -= removed;
@@ -203,11 +215,16 @@ class MetricsCollector {
     uptime: number;
     timestamp: string;
   } {
-    const uptimeSeconds = Math.floor((Date.now() - this.metrics.startTime) / 1000);
-    const avgLatency = this.metrics.latency.samples.length > 0
-      ? Math.round(this.metrics.latency.sum / this.metrics.latency.samples.length)
-      : 0;
-    
+    const uptimeSeconds = Math.floor(
+      (Date.now() - this.metrics.startTime) / 1000
+    );
+    const avgLatency =
+      this.metrics.latency.samples.length > 0
+        ? Math.round(
+            this.metrics.latency.sum / this.metrics.latency.samples.length
+          )
+        : 0;
+
     // Calculate requests per minute
     const minutesUp = Math.max(1, uptimeSeconds / 60);
     const requestsPerMin = Math.round(this.metrics.requests.total / minutesUp);
@@ -215,49 +232,43 @@ class MetricsCollector {
     return {
       requests: {
         total: this.metrics.requests.total,
-        rate: `${requestsPerMin} req/min`
+        rate: `${requestsPerMin} req/min`,
       },
       responses: {
         by_status: { ...this.metrics.requests.byStatus },
-        average_time: `${avgLatency}ms`
+        average_time: `${avgLatency}ms`,
       },
       services: { ...this.metrics.requests.byService },
       uptime: uptimeSeconds,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
 
 class APIGateway {
-  private redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+  private redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
   private circuitBreaker = new CircuitBreaker({
     failureThreshold: 5,
     resetTimeout: 30000,
-    halfOpenSuccessThreshold: 2
+    halfOpenSuccessThreshold: 2,
   });
 
   private metricsCollector = new MetricsCollector();
 
-  // MEDIUM: Hardcoded service URLs - manual configuration required
-  // FIXME: Service discovery hardcoded, not K8s-friendly
-  // TODO: Implement service discovery:
-  //   1. Use Kubernetes DNS (service-name.namespace.svc.cluster.local)
-  //   2. Or integrate with Consul/etcd for service registry
-  //   3. Add health-check based routing (skip unhealthy instances)
-  //   4. Support dynamic service registration
-  // Impact: Manual config for each environment, no auto-scaling
-  // Effort: 2-3 days | Priority: MEDIUM
+  // Service URLs configured via environment variables
+  // Supports both localhost (dev) and Docker service names (compose)
+  // For Kubernetes, use service-name.namespace.svc.cluster.local format
   private services: ServiceRoute[] = [
     {
-      prefix: '/api/v1/tenants',
-      target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
-      requiresAuth: true
+      prefix: "/api/v1/tenants",
+      target: process.env.TENANT_MANAGER_URL || "http://localhost:3001",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/auth',
-      target: process.env.AUTH_SERVICE_URL || 'http://localhost:3002',
-      requiresAuth: false
+      prefix: "/api/v1/auth",
+      target: process.env.AUTH_SERVICE_URL || "http://localhost:3002",
+      requiresAuth: false,
     },
     {
       prefix: '/api/v1/users',
@@ -270,14 +281,14 @@ class APIGateway {
       requiresAuth: true
     },
     {
-      prefix: '/api/v1/tests',
-      target: process.env.TEST_GENERATOR_URL || 'http://localhost:3004',
-      requiresAuth: true
+      prefix: "/api/v1/tests",
+      target: process.env.TEST_GENERATOR_URL || "http://localhost:3004",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/healing',
-      target: process.env.HEALING_ENGINE_URL || 'http://localhost:3005',
-      requiresAuth: true
+      prefix: "/api/v1/healing",
+      target: process.env.HEALING_ENGINE_URL || "http://localhost:3005",
+      requiresAuth: true,
     },
     {
       prefix: '/api/v1/teams',
@@ -315,35 +326,95 @@ class APIGateway {
       requiresAuth: true
     },
     {
-      prefix: '/api/v1/performance',
-      target: process.env.PERFORMANCE_TESTING_URL || 'http://localhost:3016',
-      requiresAuth: true
+      prefix: "/api/v1/performance",
+      target: process.env.PERFORMANCE_TESTING_URL || "http://localhost:3016",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/security',
-      target: process.env.SECURITY_TESTING_URL || 'http://localhost:3017',
-      requiresAuth: true
+      prefix: "/api/v1/security",
+      target: process.env.SECURITY_TESTING_URL || "http://localhost:3017",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/accessibility',
-      target: process.env.ACCESSIBILITY_TESTING_URL || 'http://localhost:3018',
-      requiresAuth: true
+      prefix: "/api/v1/accessibility",
+      target: process.env.ACCESSIBILITY_TESTING_URL || "http://localhost:3018",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/sessions/manual',
-      target: process.env.MANUAL_SESSION_HUB_URL || 'http://localhost:3019',
-      requiresAuth: true
+      prefix: "/api/v1/sessions/manual",
+      target: process.env.MANUAL_SESSION_HUB_URL || "http://localhost:3019",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/hitl',
-      target: process.env.HITL_ARCADE_URL || 'http://localhost:3011',
-      requiresAuth: true
+      prefix: "/api/v1/hitl",
+      target: process.env.HITL_ARCADE_URL || "http://localhost:3011",
+      requiresAuth: true,
     },
     {
-      prefix: '/api/v1/ci',
-      target: process.env.CICD_GOVERNOR_URL || 'http://localhost:3012',
-      requiresAuth: true
-    }
+      prefix: "/api/v1/ci",
+      target: process.env.CICD_GOVERNOR_URL || "http://localhost:3012",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/github",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/jira",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/slack",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/sentry",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/datadog",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/jenkins",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/newrelic",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/notion",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/gitlab",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/circleci",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/logs",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
+    {
+      prefix: "/api/v1/ollama",
+      target: process.env.INTEGRATIONS_URL || "http://localhost:3013",
+      requiresAuth: true,
+    },
   ];
 
   async start() {
@@ -354,13 +425,16 @@ class APIGateway {
       await this.registerRoutes();
       await this.registerProxies();
 
-      const port = parseInt(process.env.PORT || '3000', 10);
-      await fastify.listen({ port, host: '0.0.0.0' });
+      const port = parseInt(process.env.PORT || "3000", 10);
+      await fastify.listen({ port, host: "0.0.0.0" });
 
       console.log(`🌐 API Gateway running on port ${port}`);
-      console.log('📡 Registered services:', this.services.map(s => s.prefix));
+      console.log(
+        "📡 Registered services:",
+        this.services.map((s) => s.prefix)
+      );
     } catch (error) {
-      console.error('Failed to start API Gateway:', error);
+      console.error("Failed to start API Gateway:", error);
       process.exit(1);
     }
   }
@@ -377,27 +451,33 @@ class APIGateway {
           imgSrc: ["'self'", "data:"],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
-          upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-          blockAllMixedContent: process.env.NODE_ENV === 'production' ? [] : null
+          upgradeInsecureRequests:
+            process.env.NODE_ENV === "production" ? [] : null,
+          blockAllMixedContent:
+            process.env.NODE_ENV === "production" ? [] : null,
         },
         // Start with report-only in non-production for monitoring
-        reportOnly: process.env.NODE_ENV !== 'production'
+        reportOnly: process.env.NODE_ENV !== "production",
       },
       // Additional security headers
       xssFilter: true,
       noSniff: true,
-      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-      hsts: process.env.NODE_ENV === 'production' ? {
-        maxAge: 31536000, // 1 year
-        includeSubDomains: true,
-        preload: true
-      } : false
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      hsts:
+        process.env.NODE_ENV === "production"
+          ? {
+              maxAge: 31536000, // 1 year
+              includeSubDomains: true,
+              preload: true,
+            }
+          : false,
     });
 
     // CORS - improved configuration with production validation
-    const corsOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [];
-    if (process.env.NODE_ENV === 'production' && corsOrigins.length === 0) {
-      console.warn('⚠️ WARNING: ALLOWED_ORIGINS not configured in production');
+    const corsOrigins =
+      process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) || [];
+    if (process.env.NODE_ENV === "production" && corsOrigins.length === 0) {
+      console.warn("⚠️ WARNING: ALLOWED_ORIGINS not configured in production");
     }
 
     // Default development origins - includes frontend apps
@@ -410,10 +490,21 @@ class APIGateway {
     await fastify.register(cors, {
       origin: corsOrigins.length > 0 ? corsOrigins : defaultOrigins,
       credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'X-Request-ID'],
-      exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
-      maxAge: 86400 // 24 hours
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Tenant-ID",
+        "X-Request-ID",
+        "X-Mock-Mode",
+      ],
+      exposedHeaders: [
+        "X-Request-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+      ],
+      maxAge: 86400, // 24 hours
     });
 
     // Mock interceptor for development and testing
@@ -431,40 +522,45 @@ class APIGateway {
       max: number;
       ttl: number;
     }
-    
+
     const rateLimitConfig = {
-      max: process.env.NODE_ENV === 'test' ? 100 : 500, // Requests per minute
-      timeWindow: '1 minute',
+      max: process.env.NODE_ENV === "test" ? 100 : 500, // Requests per minute
+      timeWindow: "1 minute",
       errorResponseBuilder: (_request: unknown, context: RateLimitContext) => {
         return {
-          error: 'Rate limit exceeded',
+          error: "Rate limit exceeded",
           message: `Too many requests, limit: ${context.max} per minute`,
           retryAfter: context.ttl,
-          code: 'RATE_LIMIT_EXCEEDED'
+          code: "RATE_LIMIT_EXCEEDED",
         };
       },
       addHeaders: {
-        'x-ratelimit-limit': true,
-        'x-ratelimit-remaining': true,
-        'x-ratelimit-reset': true
+        "x-ratelimit-limit": true,
+        "x-ratelimit-remaining": true,
+        "x-ratelimit-reset": true,
       },
       // Key generator for per-tenant rate limiting
-      keyGenerator: (request: { headers: Record<string, string | string[] | undefined>; ip?: string }) => {
-        const tenantId = request.headers['x-tenant-id'] || 'anonymous';
-        const ip = request.ip || 'unknown';
+      keyGenerator: (request: {
+        headers: Record<string, string | string[] | undefined>;
+        ip?: string;
+      }) => {
+        const tenantId = request.headers["x-tenant-id"] || "anonymous";
+        const ip = request.ip || "unknown";
         return `${tenantId}:${ip}`;
       },
-      redis: undefined as unknown
+      redis: undefined as unknown,
     };
 
     // Try to use Redis for rate limiting if available
     try {
-      if (this.redis.status === 'ready') {
+      if (this.redis.status === "ready") {
         rateLimitConfig.redis = this.redis;
-        console.log('✅ Rate limiting using Redis store');
+        console.log("✅ Rate limiting using Redis store");
       }
     } catch (error) {
-      console.warn('⚠️ Redis not available for rate limiting, using memory store');
+      console.warn(
+        "⚠️ Redis not available for rate limiting, using memory store"
+      );
     }
 
     await fastify.register(rateLimit, rateLimitConfig);
@@ -473,53 +569,64 @@ class APIGateway {
     // Production validation is handled at startup via validateProductionConfig()
     const jwtConfig = getJwtConfig();
     await fastify.register(jwt, {
-      secret: jwtConfig.secret
+      secret: jwtConfig.secret,
     });
+
+    // Register mock interceptor hook
+    const MOCK_MODE = process.env.MOCK_MODE === "true";
+    if (MOCK_MODE) {
+      console.log("🎭 Mock mode enabled - intercepting API calls");
+      fastify.addHook("preHandler", mockInterceptor);
+    }
   }
 
   private async registerRoutes() {
     // Health check with circuit breaker protection
-    fastify.get('/health', async () => {
+    fastify.get("/health", async () => {
       const serviceHealth = await Promise.allSettled(
         this.services.map(async (service) => {
-          const serviceName = service.prefix.replace('/api/v1/', '');
+          const serviceName = service.prefix.replace("/api/v1/", "");
           const startTime = Date.now();
-          
+
           // Check circuit breaker before attempting
           if (!this.circuitBreaker.canAttempt(serviceName)) {
             return {
               service: service.prefix,
-              status: 'circuit-open',
+              status: "circuit-open",
               target: service.target,
-              circuitState: this.circuitBreaker.getState(serviceName).state
+              circuitState: this.circuitBreaker.getState(serviceName).state,
             };
           }
 
           try {
             const response = await fetch(`${service.target}/health`, {
-              method: 'GET',
-              signal: AbortSignal.timeout(5000)
+              method: "GET",
+              signal: AbortSignal.timeout(5000),
             });
-            
+
             const latency = Date.now() - startTime;
-            
+
             if (response.ok) {
               this.circuitBreaker.recordSuccess(serviceName);
               this.metricsCollector.recordRequest(serviceName, 200, latency);
               return {
                 service: service.prefix,
-                status: 'healthy',
+                status: "healthy",
                 target: service.target,
-                responseTime: `${latency}ms`
+                responseTime: `${latency}ms`,
               };
             } else {
               this.circuitBreaker.recordFailure(serviceName);
-              this.metricsCollector.recordRequest(serviceName, response.status, latency);
+              this.metricsCollector.recordRequest(
+                serviceName,
+                response.status,
+                latency
+              );
               return {
                 service: service.prefix,
-                status: 'unhealthy',
+                status: "unhealthy",
                 target: service.target,
-                responseTime: `${latency}ms`
+                responseTime: `${latency}ms`,
               };
             }
           } catch (error) {
@@ -528,64 +635,67 @@ class APIGateway {
             this.metricsCollector.recordRequest(serviceName, 503, latency);
             return {
               service: service.prefix,
-              status: 'unreachable',
+              status: "unreachable",
               target: service.target,
-              responseTime: `${latency}ms`
+              responseTime: `${latency}ms`,
             };
           }
         })
       );
 
-      const results = serviceHealth.map(result =>
-        result.status === 'fulfilled' ? result.value : {
-          service: 'unknown',
-          status: 'error'
-        }
+      const results = serviceHealth.map((result) =>
+        result.status === "fulfilled"
+          ? result.value
+          : {
+              service: "unknown",
+              status: "error",
+            }
       );
 
       // Determine overall status
-      const healthyCount = results.filter(s => s.status === 'healthy').length;
-      const overallStatus = healthyCount === results.length 
-        ? 'healthy' 
-        : healthyCount > 0 
-          ? 'degraded' 
-          : 'unhealthy';
+      const healthyCount = results.filter((s) => s.status === "healthy").length;
+      const overallStatus =
+        healthyCount === results.length
+          ? "healthy"
+          : healthyCount > 0
+            ? "degraded"
+            : "unhealthy";
 
       return {
         status: overallStatus,
-        service: 'api-gateway',
+        service: "api-gateway",
         timestamp: new Date().toISOString(),
         services: results,
-        circuitBreakers: this.circuitBreaker.getStatus()
+        circuitBreakers: this.circuitBreaker.getStatus(),
       };
     });
 
     // Service health aggregation endpoint
-    fastify.get('/api/v1/services/health', async () => {
+    fastify.get("/api/v1/services/health", async () => {
       const serviceHealth = await Promise.allSettled(
         this.services.map(async (service) => {
-          const serviceName = service.prefix.replace('/api/v1/', '');
+          const serviceName = service.prefix.replace("/api/v1/", "");
           const startTime = Date.now();
-          
+
           // Check circuit breaker
           if (!this.circuitBreaker.canAttempt(serviceName)) {
             return {
               service: serviceName,
-              status: 'circuit-open',
+              status: "circuit-open",
               last_check: new Date().toISOString(),
-              response_time: 'N/A',
+              response_time: "N/A",
               target: service.target,
-              circuit_state: this.circuitBreaker.getState(serviceName).state
+              circuit_state: this.circuitBreaker.getState(serviceName).state,
             };
           }
 
           try {
             const response = await fetch(`${service.target}/health`, {
-              method: 'GET',
-              signal: AbortSignal.timeout(3000)
+              method: "GET",
+              signal: AbortSignal.timeout(3000),
             });
             const responseTime = Date.now() - startTime;
-            
+
             if (response.ok) {
               this.circuitBreaker.recordSuccess(serviceName);
             } else {
@@ -594,97 +704,107 @@ class APIGateway {
 
             return {
               service: serviceName,
-              status: response.ok ? 'healthy' : 'unhealthy',
+              status: response.ok ? "healthy" : "unhealthy",
               last_check: new Date().toISOString(),
               response_time: `${responseTime}ms`,
-              target: service.target
+              target: service.target,
             };
           } catch {
             this.circuitBreaker.recordFailure(serviceName);
             return {
               service: serviceName,
-              status: 'unhealthy',
+              status: "unhealthy",
               last_check: new Date().toISOString(),
-              response_time: 'timeout',
-              target: service.target
+              response_time: "timeout",
+              target: service.target,
             };
           }
         })
       );
 
       const services = serviceHealth.reduce((acc, result) => {
-        if (result.status === 'fulfilled') {
+        if (result.status === "fulfilled") {
           acc[result.value.service] = {
             status: result.value.status,
             last_check: result.value.last_check,
-            response_time: result.value.response_time
+            response_time: result.value.response_time,
           };
         }
         return acc;
       }, {} as any);
 
-      const healthyCount = Object.values(services).filter((s: any) => s.status === 'healthy').length;
+      const healthyCount = Object.values(services).filter(
+        (s: any) => s.status === "healthy"
+      ).length;
       const totalCount = Object.keys(services).length;
 
       let overall_status;
       if (healthyCount === totalCount) {
-        overall_status = 'healthy';
+        overall_status = "healthy";
       } else if (healthyCount > 0) {
-        overall_status = 'degraded';
+        overall_status = "degraded";
       } else {
-        overall_status = 'unhealthy';
+        overall_status = "unhealthy";
       }
 
       return {
         overall_status,
         services,
         circuitBreakers: this.circuitBreaker.getStatus(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     });
 
     // Gateway metrics endpoint - now with real metrics
-    fastify.get('/api/v1/metrics', async () => {
+    fastify.get("/api/v1/metrics", async () => {
       const metrics = this.metricsCollector.getMetrics();
-      
+
       return {
         requests: metrics.requests,
         responses: metrics.responses,
         services: {
           count: this.services.length,
-          breakdown: metrics.services
+          breakdown: metrics.services,
         },
         circuitBreakers: this.circuitBreaker.getStatus(),
         uptime: metrics.uptime,
-        timestamp: metrics.timestamp
+        timestamp: metrics.timestamp,
       };
     });
 
     // API documentation endpoint
-    fastify.get('/api/docs', async () => {
+    fastify.get("/api/docs", async () => {
       return {
-        title: 'Shifty API Gateway',
-        version: '1.0.0',
-        services: this.services.map(service => ({
+        title: "Shifty API Gateway",
+        version: "1.0.0",
+        services: this.services.map((service) => ({
           prefix: service.prefix,
           requiresAuth: service.requiresAuth,
-          documentation: `${service.target}/docs`
-        }))
+          documentation: `${service.target}/docs`,
+        })),
       };
     });
 
     // Track metrics for all requests via hook
-    fastify.addHook('onResponse', async (request, reply) => {
-      const service = this.services.find(s => request.url.startsWith(s.prefix));
-      const serviceName = service ? service.prefix.replace('/api/v1/', '') : 'gateway';
+    fastify.addHook("onResponse", async (request, reply) => {
+      const service = this.services.find((s) =>
+        request.url.startsWith(s.prefix)
+      );
+      const serviceName = service
+        ? service.prefix.replace("/api/v1/", "")
+        : "gateway";
       const latency = reply.getResponseTime();
-      this.metricsCollector.recordRequest(serviceName, reply.statusCode, latency);
+      this.metricsCollector.recordRequest(
+        serviceName,
+        reply.statusCode,
+        latency
+      );
     });
 
     // Authentication middleware
-    fastify.addHook('preHandler', async (request, reply) => {
+    fastify.addHook("preHandler", async (request, reply) => {
       try {
-        const service = this.services.find(s =>
+        const service = this.services.find((s) =>
           request.url.startsWith(s.prefix)
         );
 
@@ -695,33 +815,44 @@ class APIGateway {
             // Validate JWT payload structure and content using Zod schema
             const payload = request.user as unknown;
             const validationResult = safeValidateJwtPayload(payload);
-            
+
             if (!validationResult.success) {
-              console.warn('JWT payload validation failed:', validationResult.error.errors);
-              const validationError = createValidationErrorResponse(validationResult.error);
+              console.warn(
+                "JWT payload validation failed:",
+                validationResult.error.errors
+              );
+              const validationError = createValidationErrorResponse(
+                validationResult.error
+              );
               return reply.status(401).send({
-                error: 'Unauthorized',
-                message: 'Invalid token payload',
+                error: "Unauthorized",
+                message: "Invalid token payload",
                 code: validationError.code,
-                details: validationError.details
+                details: validationError.details,
               });
             }
 
             const validatedPayload = validationResult.data;
-            
-            // Set validated and sanitized headers
-            request.headers['x-tenant-id'] = validatedPayload.tenantId;
-            request.headers['x-user-id'] = validatedPayload.userId;
-            request.headers['x-user-role'] = validatedPayload.role;
 
+            // Set validated and sanitized headers
+            request.headers["x-tenant-id"] = validatedPayload.tenantId;
+            request.headers["x-user-id"] = validatedPayload.userId;
+            request.headers["x-user-role"] = validatedPayload.role;
           } catch (jwtErr: any) {
-            console.log('JWT verification failed:', jwtErr.message);
-            return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid or missing token' });
+            console.log("JWT verification failed:", jwtErr.message);
+            return reply
+              .status(401)
+              .send({
+                error: "Unauthorized",
+                message: "Invalid or missing token",
+              });
           }
         }
       } catch (err: any) {
-        console.error('Auth middleware error:', err);
-        return reply.status(500).send({ error: 'Authentication service error' });
+        console.error("Auth middleware error:", err);
+        return reply
+          .status(500)
+          .send({ error: "Authentication service error" });
       }
     });
   }
@@ -736,11 +867,11 @@ class APIGateway {
           onError: (reply, error) => {
             console.error(`Proxy error for ${service.prefix}:`, error);
             reply.status(503).send({
-              error: 'Service unavailable',
-              service: service.prefix
+              error: "Service unavailable",
+              service: service.prefix,
             });
-          }
-        }
+          },
+        },
       });
     }
   }
@@ -748,7 +879,7 @@ class APIGateway {
   async stop() {
     await this.redis.quit();
     await fastify.close();
-    console.log('API Gateway stopped');
+    console.log("API Gateway stopped");
   }
 }
 
@@ -756,14 +887,14 @@ const gateway = new APIGateway();
 gateway.start();
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully");
   await gateway.stop();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully");
   await gateway.stop();
   process.exit(0);
 });

@@ -1,0 +1,262 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/arcade/mission/[id]",
+      "regex": "^/arcade/mission/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/arcade/mission/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/healing/[id]",
+      "regex": "^/healing/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/healing/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/knowledge/[id]",
+      "regex": "^/knowledge/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/knowledge/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/pipelines/[id]",
+      "regex": "^/pipelines/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/pipelines/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/projects/[id]",
+      "regex": "^/projects/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/projects/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/sessions/[id]",
+      "regex": "^/sessions/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/sessions/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/teams/[id]",
+      "regex": "^/teams/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/teams/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/teams/[id]/members/[memberId]",
+      "regex": "^/teams/([^/]+?)/members/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPmemberId": "nxtPmemberId"
+      },
+      "namedRegex": "^/teams/(?<nxtPid>[^/]+?)/members/(?<nxtPmemberId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/tests/[id]",
+      "regex": "^/tests/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/tests/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/adoption",
+      "regex": "^/adoption(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/adoption(?:/)?$"
+    },
+    {
+      "page": "/agent-prs",
+      "regex": "^/agent\\-prs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/agent\\-prs(?:/)?$"
+    },
+    {
+      "page": "/api-docs",
+      "regex": "^/api\\-docs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api\\-docs(?:/)?$"
+    },
+    {
+      "page": "/arcade",
+      "regex": "^/arcade(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/arcade(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/healing",
+      "regex": "^/healing(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/healing(?:/)?$"
+    },
+    {
+      "page": "/insights",
+      "regex": "^/insights(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/insights(?:/)?$"
+    },
+    {
+      "page": "/insights/roi",
+      "regex": "^/insights/roi(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/insights/roi(?:/)?$"
+    },
+    {
+      "page": "/insights/roi/config",
+      "regex": "^/insights/roi/config(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/insights/roi/config(?:/)?$"
+    },
+    {
+      "page": "/knowledge",
+      "regex": "^/knowledge(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/knowledge(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/organization",
+      "regex": "^/organization(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/organization(?:/)?$"
+    },
+    {
+      "page": "/pipelines",
+      "regex": "^/pipelines(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/pipelines(?:/)?$"
+    },
+    {
+      "page": "/pipelines/configure",
+      "regex": "^/pipelines/configure(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/pipelines/configure(?:/)?$"
+    },
+    {
+      "page": "/sessions",
+      "regex": "^/sessions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sessions(?:/)?$"
+    },
+    {
+      "page": "/sessions/new",
+      "regex": "^/sessions/new(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sessions/new(?:/)?$"
+    },
+    {
+      "page": "/sessions/start",
+      "regex": "^/sessions/start(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sessions/start(?:/)?$"
+    },
+    {
+      "page": "/settings",
+      "regex": "^/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/settings(?:/)?$"
+    },
+    {
+      "page": "/teams",
+      "regex": "^/teams(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teams(?:/)?$"
+    },
+    {
+      "page": "/tests",
+      "regex": "^/tests(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tests(?:/)?$"
+    },
+    {
+      "page": "/tests/generate",
+      "regex": "^/tests/generate(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tests/generate(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

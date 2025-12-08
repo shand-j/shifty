@@ -74,16 +74,56 @@ class TenantManagerApp {
   }
 
   private initializeMiddleware() {
-    // MEDIUM: Express security middleware not optimally configured
-    // FIXME: Using defaults, no custom CSP, HSTS, or frame options
-    // TODO: Harden helmet configuration with strict CSP
-    // Effort: 4 hours | Priority: MEDIUM
-    this.app.use(helmet());
-    // MEDIUM: CORS configuration - see API Gateway comments
-    // Effort: 2 hours | Priority: MEDIUM
+    // Hardened security middleware with strict CSP and HSTS
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for UI frameworks
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'"],
+          fontSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          mediaSrc: ["'self'"],
+          frameSrc: ["'none'"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000, // 1 year
+        includeSubDomains: true,
+        preload: true
+      },
+      frameguard: {
+        action: 'deny' // Prevent clickjacking
+      },
+      referrerPolicy: {
+        policy: 'strict-origin-when-cross-origin'
+      },
+      xssFilter: true,
+      noSniff: true,
+      ieNoOpen: true,
+      hidePoweredBy: true
+    }));
+    // Hardened CORS configuration
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:5173'];
     this.app.use(cors({
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-      credentials: true
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin is allowed
+        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
+      exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
+      maxAge: 86400 // 24 hours
     }));
 
     // Performance middleware

@@ -99,21 +99,40 @@ class AuthService {
   }
 
   private async registerRoutes() {
-    // MEDIUM: Health endpoint publicly exposed - information disclosure
-    // FIXME: No authentication, reveals service name, version, internal status
-    // TODO: Add authentication or move to internal network:
-    //   1. Add API key validation for health checks
-    //   2. Only expose /health to load balancer IP range
-    //   3. Separate public /status (minimal info) from internal /health (detailed)
-    //   4. Remove detailed error messages from public responses
-    // Impact: Attackers learn service topology, versions, dependencies
-    // Effort: 4 hours | Priority: MEDIUM
-    fastify.get('/health', async () => {
+    // Secured health endpoint - minimal public info, detailed info requires auth
+    fastify.get('/health', async (request, reply) => {
+      // Public health check - minimal information
       return {
         status: 'healthy',
-        service: 'auth-service',
         timestamp: new Date().toISOString()
       };
+    });
+
+    // Detailed health check - requires authentication
+    fastify.get('/health/detailed', async (request, reply) => {
+      try {
+        // Verify JWT token
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Authentication required' });
+        }
+
+        const token = authHeader.substring(7);
+        jwt.verify(token, this.jwtSecret);
+
+        // Return detailed health information
+        const dbHealth = await this.dbManager.healthCheck();
+        return {
+          status: 'healthy',
+          service: 'auth-service',
+          version: process.env.SERVICE_VERSION || '1.0.0',
+          timestamp: new Date().toISOString(),
+          database: dbHealth,
+          uptime: process.uptime()
+        };
+      } catch (error) {
+        return reply.status(401).send({ error: 'Invalid authentication' });
+      }
     });
 
     // Register new user and tenant

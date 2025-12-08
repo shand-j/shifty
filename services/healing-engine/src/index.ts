@@ -159,19 +159,40 @@ class HealingEngineService {
   }
 
   private async registerRoutes() {
-    // MEDIUM: Health endpoint publicly exposed - information disclosure
-    // FIXME: Reveals browser availability, healing strategies to public
-    // See auth-service comments for implementation details
-    // Effort: 4 hours | Priority: MEDIUM
+    // Secured health endpoint - minimal public info
     fastify.get('/health', async () => {
-      const healerHealth = await this.selectorHealer.healthCheck();
-      
       return {
-        status: healerHealth.status,
-        service: 'healing-engine',
-        healer: healerHealth,
+        status: 'healthy',
         timestamp: new Date().toISOString()
       };
+    });
+
+    // Detailed health check - for internal monitoring
+    fastify.get('/health/detailed', async (request, reply) => {
+      try {
+        const authHeader = request.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+          return reply.status(401).send({ error: 'Authentication required' });
+        }
+
+        const token = authHeader.substring(7);
+        jwt.verify(token, jwtConfig.secret);
+
+        const healerHealth = await this.selectorHealer.healthCheck();
+        const browserStats = this.browserPool.getStats();
+        
+        return {
+          status: healerHealth.status,
+          service: 'healing-engine',
+          version: process.env.SERVICE_VERSION || '1.0.0',
+          healer: healerHealth,
+          browserPool: browserStats,
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime()
+        };
+      } catch (error) {
+        return reply.status(401).send({ error: 'Invalid authentication' });
+      }
     });
 
     // Helper function to extract tenant from JWT

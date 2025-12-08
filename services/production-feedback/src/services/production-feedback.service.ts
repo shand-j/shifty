@@ -1,19 +1,18 @@
-import { v4 as uuidv4 } from 'uuid';
-import * as crypto from 'crypto';
-import axios from 'axios';
-import { DatabaseManager } from '@shifty/database';
+import { DatabaseManager } from "@shifty/database";
 import {
-  ErrorEvent,
   ErrorCluster,
+  ErrorEvent,
   ErrorSeverity,
   ErrorSource,
+  FeedbackLoopExecution,
+  FeedbackLoopRule,
+  ImpactAnalysis,
   RegressionTest,
   RegressionTestRequest,
-  FeedbackLoopRule,
-  FeedbackLoopExecution,
-  ProductionIncident,
-  ImpactAnalysis,
-} from '@shifty/shared';
+} from "@shifty/shared";
+import axios from "axios";
+import * as crypto from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 export class ProductionFeedbackService {
   private dbManager: DatabaseManager;
@@ -30,7 +29,7 @@ export class ProductionFeedbackService {
   async ingestError(
     tenantId: string,
     source: ErrorSource,
-    errorData: Omit<ErrorEvent, 'id' | 'tenantId' | 'source' | 'createdAt'>
+    errorData: Omit<ErrorEvent, "id" | "tenantId" | "source" | "createdAt">
   ): Promise<ErrorEvent> {
     const eventId = uuidv4();
 
@@ -49,11 +48,22 @@ export class ProductionFeedbackService {
         first_seen, last_seen, occurrence_count, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
       [
-        eventId, tenantId, source, errorData.externalId, errorData.errorType,
-        errorData.message, errorData.stackTrace || null, errorData.severity,
-        errorData.environment, errorData.service, errorData.endpoint || null,
-        errorData.userId || null, JSON.stringify(errorData.metadata),
-        errorData.firstSeen, errorData.lastSeen, errorData.occurrenceCount,
+        eventId,
+        tenantId,
+        source,
+        errorData.externalId,
+        errorData.errorType,
+        errorData.message,
+        errorData.stackTrace || null,
+        errorData.severity,
+        errorData.environment,
+        errorData.service,
+        errorData.endpoint || null,
+        errorData.userId || null,
+        JSON.stringify(errorData.metadata),
+        errorData.firstSeen,
+        errorData.lastSeen,
+        errorData.occurrenceCount,
         errorEvent.createdAt,
       ]
     );
@@ -74,12 +84,15 @@ export class ProductionFeedbackService {
     const fingerprint = this.generateErrorFingerprint(event);
 
     // Check if cluster exists
-    const existingCluster = await this.getClusterByFingerprint(event.tenantId, fingerprint);
+    const existingCluster = await this.getClusterByFingerprint(
+      event.tenantId,
+      fingerprint
+    );
 
     if (existingCluster) {
       // Update existing cluster
       await this.dbManager.query(
-        `UPDATE error_clusters SET 
+        `UPDATE error_clusters SET
           error_count = error_count + $2,
           last_occurrence = $3,
           updated_at = NOW()
@@ -92,7 +105,7 @@ export class ProductionFeedbackService {
     } else {
       // Create new cluster
       const clusterId = uuidv4();
-      
+
       await this.dbManager.query(
         `INSERT INTO error_clusters (
           id, tenant_id, name, fingerprint, error_type, primary_message,
@@ -100,10 +113,21 @@ export class ProductionFeedbackService {
           first_occurrence, last_occurrence, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
-          clusterId, event.tenantId, `${event.errorType}: ${event.message.slice(0, 50)}`,
-          fingerprint, event.errorType, event.message, event.severity, 'new',
-          JSON.stringify([event.service]), JSON.stringify(event.endpoint ? [event.endpoint] : []),
-          event.occurrenceCount, event.firstSeen, event.lastSeen, new Date(), new Date(),
+          clusterId,
+          event.tenantId,
+          `${event.errorType}: ${event.message.slice(0, 50)}`,
+          fingerprint,
+          event.errorType,
+          event.message,
+          event.severity,
+          "new",
+          JSON.stringify([event.service]),
+          JSON.stringify(event.endpoint ? [event.endpoint] : []),
+          event.occurrenceCount,
+          event.firstSeen,
+          event.lastSeen,
+          new Date(),
+          new Date(),
         ]
       );
 
@@ -121,10 +145,11 @@ export class ProductionFeedbackService {
       event.service,
       this.normalizeErrorMessage(event.message),
     ];
-    
-    return crypto.createHash('sha256')
-      .update(components.join(':'))
-      .digest('hex')
+
+    return crypto
+      .createHash("sha256")
+      .update(components.join(":"))
+      .digest("hex")
       .slice(0, 32);
   }
 
@@ -134,9 +159,12 @@ export class ProductionFeedbackService {
   private normalizeErrorMessage(message: string): string {
     // Remove variable parts like IDs, timestamps, etc.
     return message
-      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, 'UUID')
-      .replace(/\d{13,}/g, 'TIMESTAMP')
-      .replace(/\d+/g, 'N')
+      .replace(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+        "UUID"
+      )
+      .replace(/\d{13,}/g, "TIMESTAMP")
+      .replace(/\d+/g, "N")
       .slice(0, 200);
   }
 
@@ -147,9 +175,10 @@ export class ProductionFeedbackService {
     tenantId: string,
     fingerprint: string
   ): Promise<ErrorCluster | null> {
-    const query = 'SELECT * FROM error_clusters WHERE tenant_id = $1 AND fingerprint = $2';
+    const query =
+      "SELECT * FROM error_clusters WHERE tenant_id = $1 AND fingerprint = $2";
     const result = await this.dbManager.query(query, [tenantId, fingerprint]);
-    
+
     if (result.rows.length === 0) {
       return null;
     }
@@ -163,9 +192,9 @@ export class ProductionFeedbackService {
    * Get error cluster by ID
    */
   async getCluster(clusterId: string): Promise<ErrorCluster | null> {
-    const query = 'SELECT * FROM error_clusters WHERE id = $1';
+    const query = "SELECT * FROM error_clusters WHERE id = $1";
     const result = await this.dbManager.query(query, [clusterId]);
-    
+
     if (result.rows.length === 0) {
       return null;
     }
@@ -182,7 +211,7 @@ export class ProductionFeedbackService {
     severity?: ErrorSeverity,
     limit: number = 50
   ): Promise<ErrorCluster[]> {
-    let query = 'SELECT * FROM error_clusters WHERE tenant_id = $1';
+    let query = "SELECT * FROM error_clusters WHERE tenant_id = $1";
     const values: any[] = [tenantId];
 
     if (status) {
@@ -195,20 +224,23 @@ export class ProductionFeedbackService {
       query += ` AND severity = $${values.length}`;
     }
 
-    query += ' ORDER BY last_occurrence DESC LIMIT $' + (values.length + 1);
+    query += " ORDER BY last_occurrence DESC LIMIT $" + (values.length + 1);
     values.push(limit);
 
     const result = await this.dbManager.query(query, values);
-    return result.rows.map(row => this.transformClusterRow(row));
+    return result.rows.map((row) => this.transformClusterRow(row));
   }
 
   /**
    * Update cluster status
    */
-  async updateClusterStatus(clusterId: string, status: ErrorCluster['status']): Promise<void> {
+  async updateClusterStatus(
+    clusterId: string,
+    status: ErrorCluster["status"]
+  ): Promise<void> {
     await this.dbManager.query(
       `UPDATE error_clusters SET status = $2, updated_at = NOW()
-       ${status === 'resolved' ? ', resolved_at = NOW()' : ''} WHERE id = $1`,
+       ${status === "resolved" ? ", resolved_at = NOW()" : ""} WHERE id = $1`,
       [clusterId, status]
     );
   }
@@ -218,10 +250,12 @@ export class ProductionFeedbackService {
   /**
    * Generate regression test for error cluster
    */
-  async generateRegressionTest(request: RegressionTestRequest): Promise<RegressionTest> {
+  async generateRegressionTest(
+    request: RegressionTestRequest
+  ): Promise<RegressionTest> {
     const testId = uuidv4();
     const cluster = await this.getCluster(request.errorClusterId);
-    
+
     if (!cluster) {
       throw new Error(`Error cluster not found: ${request.errorClusterId}`);
     }
@@ -240,7 +274,7 @@ export class ProductionFeedbackService {
       framework: request.framework,
       testCode,
       scenarios: this.extractScenarios(cluster, testCode),
-      status: 'draft',
+      status: "draft",
       deployedToPipeline: false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -252,15 +286,23 @@ export class ProductionFeedbackService {
         test_code, scenarios, status, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
-        testId, request.tenantId, request.errorClusterId, test.name,
-        test.description, request.framework, testCode, JSON.stringify(test.scenarios),
-        'draft', test.createdAt, test.updatedAt,
+        testId,
+        request.tenantId,
+        request.errorClusterId,
+        test.name,
+        test.description,
+        request.framework,
+        testCode,
+        JSON.stringify(test.scenarios),
+        "draft",
+        test.createdAt,
+        test.updatedAt,
       ]
     );
 
     // Update cluster with regression test ID
     await this.dbManager.query(
-      'UPDATE error_clusters SET regression_test_id = $2, updated_at = NOW() WHERE id = $1',
+      "UPDATE error_clusters SET regression_test_id = $2, updated_at = NOW() WHERE id = $1",
       [request.errorClusterId, testId]
     );
 
@@ -288,22 +330,24 @@ export class ProductionFeedbackService {
             affectedEndpoints: cluster.affectedEndpoints,
           },
           framework: request.framework,
-          type: 'regression',
+          type: "regression",
         },
         { timeout: 60000 }
       );
 
-      return response.data.testCode || this.getDefaultTestTemplate(cluster, request);
+      return (
+        response.data.testCode || this.getDefaultTestTemplate(cluster, request)
+      );
     } catch (error) {
-      console.error('Failed to generate test code via AI:', error);
+      console.error("Failed to generate test code via AI:", error);
       return this.getDefaultTestTemplate(cluster, request);
     }
   }
 
-  /**
-   * Get default test template
-   */
-  private getDefaultTestTemplate(cluster: ErrorCluster, request: RegressionTestRequest): string {
+  private getDefaultTestTemplate(
+    cluster: ErrorCluster,
+    request: RegressionTestRequest
+  ): string {
     const templates: Record<string, string> = {
       playwright: `
 import { test, expect } from '@playwright/test';
@@ -328,8 +372,8 @@ test.describe('Regression: ${cluster.errorType}', () => {
 describe('Regression: ${cluster.errorType}', () => {
   it('should not reproduce error: ${cluster.primaryMessage.slice(0, 50)}', async () => {
     // Setup
-    const service = '${cluster.affectedServices[0] || 'service'}';
-    
+    const service = '${cluster.affectedServices[0] || "service"}';
+
     // Execute action that triggered error
     ${this.generateJestSteps(cluster)}
     
@@ -418,28 +462,30 @@ describe('Regression: ${cluster.errorType}', () => {
   private extractScenarios(
     cluster: ErrorCluster,
     testCode: string
-  ): RegressionTest['scenarios'] {
-    return [{
-      name: `Prevent ${cluster.errorType}`,
-      steps: [
-        'Navigate to affected endpoint',
-        'Perform triggering action',
-        'Verify error does not occur',
-      ],
-      assertions: [
-        `No ${cluster.errorType} should be thrown`,
-        'Page should load successfully',
-      ],
-    }];
+  ): RegressionTest["scenarios"] {
+    return [
+      {
+        name: `Prevent ${cluster.errorType}`,
+        steps: [
+          "Navigate to affected endpoint",
+          "Perform triggering action",
+          "Verify error does not occur",
+        ],
+        assertions: [
+          `No ${cluster.errorType} should be thrown`,
+          "Page should load successfully",
+        ],
+      },
+    ];
   }
 
   /**
    * Get regression test by ID
    */
   async getRegressionTest(testId: string): Promise<RegressionTest | null> {
-    const query = 'SELECT * FROM regression_tests WHERE id = $1';
+    const query = "SELECT * FROM regression_tests WHERE id = $1";
     const result = await this.dbManager.query(query, [testId]);
-    
+
     if (result.rows.length === 0) {
       return null;
     }
@@ -450,7 +496,10 @@ describe('Regression: ${cluster.errorType}', () => {
   /**
    * Approve and deploy regression test
    */
-  async approveRegressionTest(testId: string, approvedBy: string): Promise<void> {
+  async approveRegressionTest(
+    testId: string,
+    approvedBy: string
+  ): Promise<void> {
     await this.dbManager.query(
       `UPDATE regression_tests SET status = 'approved', approved_by = $2, updated_at = NOW()
        WHERE id = $1`,
@@ -467,7 +516,7 @@ describe('Regression: ${cluster.errorType}', () => {
    */
   async createFeedbackLoopRule(
     tenantId: string,
-    rule: Omit<FeedbackLoopRule, 'id' | 'tenantId' | 'createdAt' | 'updatedAt'>
+    rule: Omit<FeedbackLoopRule, "id" | "tenantId" | "createdAt" | "updatedAt">
   ): Promise<FeedbackLoopRule> {
     const ruleId = uuidv4();
 
@@ -485,10 +534,16 @@ describe('Regression: ${cluster.errorType}', () => {
         enabled, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
-        ruleId, tenantId, rule.name, rule.description || null,
-        JSON.stringify(rule.trigger), JSON.stringify(rule.actions),
-        JSON.stringify(rule.actionConfig), rule.enabled,
-        fullRule.createdAt, fullRule.updatedAt,
+        ruleId,
+        tenantId,
+        rule.name,
+        rule.description || null,
+        JSON.stringify(rule.trigger),
+        JSON.stringify(rule.actions),
+        JSON.stringify(rule.actionConfig),
+        rule.enabled,
+        fullRule.createdAt,
+        fullRule.updatedAt,
       ]
     );
 
@@ -504,12 +559,13 @@ describe('Regression: ${cluster.errorType}', () => {
     cluster: ErrorCluster
   ): Promise<void> {
     // Get active rules for tenant
-    const query = 'SELECT * FROM feedback_loop_rules WHERE tenant_id = $1 AND enabled = true';
+    const query =
+      "SELECT * FROM feedback_loop_rules WHERE tenant_id = $1 AND enabled = true";
     const result = await this.dbManager.query(query, [tenantId]);
 
     for (const row of result.rows) {
       const rule = this.transformRuleRow(row);
-      
+
       if (this.shouldTriggerRule(rule, cluster)) {
         await this.executeFeedbackLoop(rule, cluster);
       }
@@ -519,21 +575,33 @@ describe('Regression: ${cluster.errorType}', () => {
   /**
    * Check if rule should be triggered
    */
-  private shouldTriggerRule(rule: FeedbackLoopRule, cluster: ErrorCluster): boolean {
+  private shouldTriggerRule(
+    rule: FeedbackLoopRule,
+    cluster: ErrorCluster
+  ): boolean {
     const trigger = rule.trigger;
 
     // Check severity
-    if (trigger.errorSeverity && !trigger.errorSeverity.includes(cluster.severity)) {
+    if (
+      trigger.errorSeverity &&
+      !trigger.errorSeverity.includes(cluster.severity)
+    ) {
       return false;
     }
 
     // Check error count threshold
-    if (trigger.errorCountThreshold && cluster.errorCount < trigger.errorCountThreshold) {
+    if (
+      trigger.errorCountThreshold &&
+      cluster.errorCount < trigger.errorCountThreshold
+    ) {
       return false;
     }
 
     // Check services
-    if (trigger.services && !trigger.services.some(s => cluster.affectedServices.includes(s))) {
+    if (
+      trigger.services &&
+      !trigger.services.some((s) => cluster.affectedServices.includes(s))
+    ) {
       return false;
     }
 
@@ -548,19 +616,21 @@ describe('Regression: ${cluster.errorType}', () => {
     cluster: ErrorCluster
   ): Promise<void> {
     const executionId = uuidv4();
-    
-    console.log(`🔄 Executing feedback loop: ${rule.name} for cluster ${cluster.id}`);
+
+    console.log(
+      `🔄 Executing feedback loop: ${rule.name} for cluster ${cluster.id}`
+    );
 
     const execution: FeedbackLoopExecution = {
       id: executionId,
       tenantId: rule.tenantId,
       ruleId: rule.id,
       errorClusterId: cluster.id,
-      triggeredActions: rule.actions.map(action => ({
+      triggeredActions: rule.actions.map((action) => ({
         action,
-        status: 'pending',
+        status: "pending",
       })),
-      status: 'running',
+      status: "running",
       createdAt: new Date(),
     };
 
@@ -570,8 +640,13 @@ describe('Regression: ${cluster.errorType}', () => {
         id, tenant_id, rule_id, error_cluster_id, triggered_actions, status, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        executionId, rule.tenantId, rule.id, cluster.id,
-        JSON.stringify(execution.triggeredActions), 'running', execution.createdAt,
+        executionId,
+        rule.tenantId,
+        rule.id,
+        cluster.id,
+        JSON.stringify(execution.triggeredActions),
+        "running",
+        execution.createdAt,
       ]
     );
 
@@ -579,35 +654,50 @@ describe('Regression: ${cluster.errorType}', () => {
     for (let i = 0; i < rule.actions.length; i++) {
       const action = rule.actions[i];
       execution.triggeredActions[i].startedAt = new Date();
-      execution.triggeredActions[i].status = 'in_progress';
+      execution.triggeredActions[i].status = "in_progress";
 
       try {
         const result = await this.executeAction(action, rule, cluster);
-        execution.triggeredActions[i].status = 'completed';
+        execution.triggeredActions[i].status = "completed";
         execution.triggeredActions[i].result = result;
         execution.triggeredActions[i].completedAt = new Date();
       } catch (error: any) {
-        execution.triggeredActions[i].status = 'failed';
+        execution.triggeredActions[i].status = "failed";
         execution.triggeredActions[i].error = error.message;
         execution.triggeredActions[i].completedAt = new Date();
       }
     }
 
     // Determine overall status
-    const hasFailures = execution.triggeredActions.some(a => a.status === 'failed');
-    const allCompleted = execution.triggeredActions.every(a => a.status === 'completed');
-    execution.status = allCompleted ? 'completed' : hasFailures ? 'partial' : 'failed';
+    const hasFailures = execution.triggeredActions.some(
+      (a) => a.status === "failed"
+    );
+    const allCompleted = execution.triggeredActions.every(
+      (a) => a.status === "completed"
+    );
+    execution.status = allCompleted
+      ? "completed"
+      : hasFailures
+        ? "partial"
+        : "failed";
     execution.completedAt = new Date();
 
     // Update execution record
     await this.dbManager.query(
-      `UPDATE feedback_loop_executions SET 
+      `UPDATE feedback_loop_executions SET
         triggered_actions = $2, status = $3, completed_at = $4
        WHERE id = $1`,
-      [executionId, JSON.stringify(execution.triggeredActions), execution.status, execution.completedAt]
+      [
+        executionId,
+        JSON.stringify(execution.triggeredActions),
+        execution.status,
+        execution.completedAt,
+      ]
     );
 
-    console.log(`✅ Feedback loop execution ${execution.status}: ${executionId}`);
+    console.log(
+      `✅ Feedback loop execution ${execution.status}: ${executionId}`
+    );
   }
 
   /**
@@ -619,19 +709,19 @@ describe('Regression: ${cluster.errorType}', () => {
     cluster: ErrorCluster
   ): Promise<Record<string, unknown>> {
     switch (action) {
-      case 'generate_regression_test':
+      case "generate_regression_test":
         const test = await this.generateRegressionTest({
           tenantId: rule.tenantId,
           errorClusterId: cluster.id,
-          framework: (rule.actionConfig.testFramework as any) || 'playwright',
-          priority: 'high',
+          framework: (rule.actionConfig.testFramework as any) || "playwright",
+          priority: "high",
           targetEndpoints: cluster.affectedEndpoints,
           includeStackTrace: true,
           generateMultipleScenarios: true,
         });
         return { testId: test.id };
 
-      case 'create_jira_ticket':
+      case "create_jira_ticket":
         // Call integrations service
         const ticketResult = await axios.post(
           `${process.env.INTEGRATIONS_URL}/api/v1/jira/tickets`,
@@ -642,24 +732,24 @@ describe('Regression: ${cluster.errorType}', () => {
 Error Cluster: ${cluster.id}
 Severity: ${cluster.severity}
 Error Count: ${cluster.errorCount}
-Affected Services: ${cluster.affectedServices.join(', ')}
+Affected Services: ${cluster.affectedServices.join(", ")}
 First Seen: ${cluster.firstOccurrence}
 Last Seen: ${cluster.lastOccurrence}
             `,
-            priority: cluster.severity === 'critical' ? 'Highest' : 'High',
-            labels: ['auto-generated', 'regression'],
+            priority: cluster.severity === "critical" ? "Highest" : "High",
+            labels: ["auto-generated", "regression"],
           },
           { timeout: 30000 }
         );
         return { ticketId: ticketResult.data.ticketId };
 
-      case 'notify_team':
+      case "notify_team":
         // Send notification via integrations service
         await axios.post(
           `${process.env.INTEGRATIONS_URL}/api/v1/notifications`,
           {
             tenantId: rule.tenantId,
-            type: 'error_alert',
+            type: "error_alert",
             data: {
               clusterId: cluster.id,
               errorType: cluster.errorType,
@@ -692,10 +782,14 @@ Last Seen: ${cluster.lastOccurrence}
 
     // Calculate impact score (0-100)
     let impactScore = 0;
-    
+
     // Severity weight
     const severityWeights: Record<ErrorSeverity, number> = {
-      critical: 40, high: 30, medium: 20, low: 10, info: 5,
+      critical: 40,
+      high: 30,
+      medium: 20,
+      low: 10,
+      info: 5,
     };
     impactScore += severityWeights[cluster.severity];
 
@@ -706,18 +800,19 @@ Last Seen: ${cluster.lastOccurrence}
     impactScore += Math.min(20, cluster.affectedServices.length * 5);
 
     // Duration weight (if ongoing)
-    const durationHours = (Date.now() - cluster.firstOccurrence.getTime()) / (1000 * 60 * 60);
+    const durationHours =
+      (Date.now() - cluster.firstOccurrence.getTime()) / (1000 * 60 * 60);
     impactScore += Math.min(10, durationHours);
 
     impactScore = Math.min(100, Math.round(impactScore));
 
     // Determine business impact
-    let businessImpact: ImpactAnalysis['businessImpact'];
-    if (impactScore >= 80) businessImpact = 'critical';
-    else if (impactScore >= 60) businessImpact = 'high';
-    else if (impactScore >= 40) businessImpact = 'medium';
-    else if (impactScore >= 20) businessImpact = 'low';
-    else businessImpact = 'minimal';
+    let businessImpact: ImpactAnalysis["businessImpact"];
+    if (impactScore >= 80) businessImpact = "critical";
+    else if (impactScore >= 60) businessImpact = "high";
+    else if (impactScore >= 40) businessImpact = "medium";
+    else if (impactScore >= 20) businessImpact = "low";
+    else businessImpact = "minimal";
 
     const analysis: ImpactAnalysis = {
       id: analysisId,
@@ -725,7 +820,8 @@ Last Seen: ${cluster.lastOccurrence}
       errorClusterId: clusterId,
       impactScore,
       businessImpact,
-      estimatedUsersAffected: cluster.impactedUsers || Math.round(cluster.errorCount * 0.7),
+      estimatedUsersAffected:
+        cluster.impactedUsers || Math.round(cluster.errorCount * 0.7),
       affectedFeatures: cluster.affectedServices,
       recommendations: this.generateRecommendations(cluster, impactScore),
       createdAt: new Date(),
@@ -738,9 +834,15 @@ Last Seen: ${cluster.lastOccurrence}
         estimated_users_affected, affected_features, recommendations, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
-        analysisId, cluster.tenantId, clusterId, impactScore, businessImpact,
-        analysis.estimatedUsersAffected, JSON.stringify(analysis.affectedFeatures),
-        JSON.stringify(analysis.recommendations), analysis.createdAt,
+        analysisId,
+        cluster.tenantId,
+        clusterId,
+        impactScore,
+        businessImpact,
+        analysis.estimatedUsersAffected,
+        JSON.stringify(analysis.affectedFeatures),
+        JSON.stringify(analysis.recommendations),
+        analysis.createdAt,
       ]
     );
 
@@ -753,38 +855,39 @@ Last Seen: ${cluster.lastOccurrence}
   private generateRecommendations(
     cluster: ErrorCluster,
     impactScore: number
-  ): ImpactAnalysis['recommendations'] {
-    const recommendations: ImpactAnalysis['recommendations'] = [];
+  ): ImpactAnalysis["recommendations"] {
+    const recommendations: ImpactAnalysis["recommendations"] = [];
 
     if (impactScore >= 70) {
       recommendations.push({
         priority: 1,
-        action: 'Immediate investigation required',
-        reasoning: 'High impact score indicates significant user/business impact',
+        action: "Immediate investigation required",
+        reasoning:
+          "High impact score indicates significant user/business impact",
       });
     }
 
     if (cluster.errorCount > 100) {
       recommendations.push({
         priority: 2,
-        action: 'Generate regression tests',
-        reasoning: 'High occurrence count suggests reproducible issue',
+        action: "Generate regression tests",
+        reasoning: "High occurrence count suggests reproducible issue",
       });
     }
 
     if (cluster.affectedServices.length > 2) {
       recommendations.push({
         priority: 3,
-        action: 'Review service dependencies',
-        reasoning: 'Multiple services affected may indicate cascading failure',
+        action: "Review service dependencies",
+        reasoning: "Multiple services affected may indicate cascading failure",
       });
     }
 
     if (!cluster.regressionTestId) {
       recommendations.push({
         priority: 4,
-        action: 'Create automated test coverage',
-        reasoning: 'No regression test exists to prevent recurrence',
+        action: "Create automated test coverage",
+        reasoning: "No regression test exists to prevent recurrence",
       });
     }
 
@@ -804,10 +907,14 @@ Last Seen: ${cluster.lastOccurrence}
       primaryMessage: row.primary_message,
       severity: row.severity,
       status: row.status,
-      affectedServices: typeof row.affected_services === 'string' 
-        ? JSON.parse(row.affected_services) : row.affected_services,
-      affectedEndpoints: typeof row.affected_endpoints === 'string'
-        ? JSON.parse(row.affected_endpoints) : row.affected_endpoints,
+      affectedServices:
+        typeof row.affected_services === "string"
+          ? JSON.parse(row.affected_services)
+          : row.affected_services,
+      affectedEndpoints:
+        typeof row.affected_endpoints === "string"
+          ? JSON.parse(row.affected_endpoints)
+          : row.affected_endpoints,
       errorCount: row.error_count,
       impactedUsers: row.impacted_users,
       firstOccurrence: row.first_occurrence,
@@ -830,10 +937,15 @@ Last Seen: ${cluster.lastOccurrence}
       description: row.description,
       framework: row.framework,
       testCode: row.test_code,
-      scenarios: typeof row.scenarios === 'string' ? JSON.parse(row.scenarios) : row.scenarios,
+      scenarios:
+        typeof row.scenarios === "string"
+          ? JSON.parse(row.scenarios)
+          : row.scenarios,
       status: row.status,
-      validationResult: row.validation_result 
-        ? (typeof row.validation_result === 'string' ? JSON.parse(row.validation_result) : row.validation_result)
+      validationResult: row.validation_result
+        ? typeof row.validation_result === "string"
+          ? JSON.parse(row.validation_result)
+          : row.validation_result
         : undefined,
       approvedBy: row.approved_by,
       deployedToPipeline: row.deployed_to_pipeline,
@@ -849,9 +961,14 @@ Last Seen: ${cluster.lastOccurrence}
       tenantId: row.tenant_id,
       name: row.name,
       description: row.description,
-      trigger: typeof row.trigger === 'string' ? JSON.parse(row.trigger) : row.trigger,
-      actions: typeof row.actions === 'string' ? JSON.parse(row.actions) : row.actions,
-      actionConfig: typeof row.action_config === 'string' ? JSON.parse(row.action_config) : row.action_config,
+      trigger:
+        typeof row.trigger === "string" ? JSON.parse(row.trigger) : row.trigger,
+      actions:
+        typeof row.actions === "string" ? JSON.parse(row.actions) : row.actions,
+      actionConfig:
+        typeof row.action_config === "string"
+          ? JSON.parse(row.action_config)
+          : row.action_config,
       enabled: row.enabled,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

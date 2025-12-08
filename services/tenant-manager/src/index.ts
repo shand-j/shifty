@@ -16,8 +16,8 @@ import { RequestLimits, validateProductionConfig } from '@shifty/shared';
 try {
   validateProductionConfig();
 } catch (error) {
-  console.error('Configuration validation failed:', error);
-  if (process.env.NODE_ENV === 'production') {
+  console.error("Configuration validation failed:", error);
+  if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 }
@@ -31,7 +31,7 @@ class TenantManagerApp {
 
   constructor() {
     this.app = express();
-    this.port = parseInt(process.env.PORT || '3001', 10);
+    this.port = parseInt(process.env.PORT || "3001", 10);
     this.dbManager = new DatabaseManager();
     this.tenantService = new TenantService(this.dbManager);
     
@@ -163,7 +163,9 @@ class TenantManagerApp {
 
     // Body parsing with centralized request limits
     this.app.use(express.json({ limit: RequestLimits.bodyLimit }));
-    this.app.use(express.urlencoded({ extended: true, limit: RequestLimits.bodyLimit }));
+    this.app.use(
+      express.urlencoded({ extended: true, limit: RequestLimits.bodyLimit })
+    );
 
     // Request logging
     this.app.use(requestLogger);
@@ -171,16 +173,16 @@ class TenantManagerApp {
 
   private initializeRoutes() {
     // Health check
-    this.app.get('/health', (req, res) => {
-      res.json({ 
-        status: 'healthy',
-        service: 'tenant-manager',
-        timestamp: new Date().toISOString()
+    this.app.get("/health", (req, res) => {
+      res.json({
+        status: "healthy",
+        service: "tenant-manager",
+        timestamp: new Date().toISOString(),
       });
     });
 
     // API routes
-    this.app.use('/api/v1/tenants', tenantRoutes(this.tenantService));
+    this.app.use("/api/v1/tenants", tenantRoutes(this.tenantService));
   }
 
   private initializeErrorHandling() {
@@ -191,14 +193,14 @@ class TenantManagerApp {
     try {
       // Initialize database connections
       await this.dbManager.initialize();
-      
+
       // Start the server
       this.app.listen(this.port, () => {
         console.log(`🏢 Tenant Manager service running on port ${this.port}`);
         console.log(`📊 Health check: http://localhost:${this.port}/health`);
       });
     } catch (error) {
-      console.error('Failed to start Tenant Manager service:', error);
+      console.error("Failed to start Tenant Manager service:", error);
       process.exit(1);
     }
   }
@@ -224,14 +226,14 @@ const app = new TenantManagerApp();
 app.start();
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully");
   await app.stop();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully");
   await app.stop();
   process.exit(0);
 });

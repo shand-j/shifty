@@ -10,6 +10,7 @@
     "packages/sdk-core",
     "packages/sdk-playwright",
     "packages/sdk-observability",
+    "packages/playwright-healing",
     "apps/api-gateway",
     "apps/web",
     "services/tenant-manager",

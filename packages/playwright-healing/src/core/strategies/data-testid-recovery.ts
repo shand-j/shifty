@@ -12,6 +12,7 @@ import {
   HealingStrategyOptions,
   ElementInfo,
 } from '../types';
+import { checkSelectorExists } from './utils';
 
 export class DataTestIdRecoveryStrategy implements HealingStrategyInterface {
   readonly name = 'data-testid-recovery' as const;
@@ -56,7 +57,7 @@ export class DataTestIdRecoveryStrategy implements HealingStrategyInterface {
 
       // Test each candidate
       for (const candidate of candidates) {
-        const exists = await this.checkSelectorExists(page, candidate.selector);
+        const exists = await checkSelectorExists(page, candidate.selector);
         if (exists) {
           return {
             success: true,
@@ -279,17 +280,5 @@ export class DataTestIdRecoveryStrategy implements HealingStrategyInterface {
       .replace(/[-_\s]/g, '')
       .replace(/([a-z])([A-Z])/g, '$1$2')
       .toLowerCase();
-  }
-
-  /**
-   * Check if selector exists on the page
-   */
-  private async checkSelectorExists(page: Page, selector: string): Promise<boolean> {
-    try {
-      const count = await page.locator(selector).count();
-      return count > 0;
-    } catch {
-      return false;
-    }
   }
 }

@@ -11,6 +11,7 @@ import {
   HealingStrategyInterface,
   HealingStrategyOptions,
 } from '../types';
+import { checkSelectorExists, validateUrl } from './utils';
 
 export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
   readonly name = 'ai-powered-analysis' as const;
@@ -25,6 +26,12 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
     timeout?: number;
   } = {}) {
     this.ollamaUrl = options.ollamaUrl || 'http://localhost:11434';
+    
+    // Validate Ollama URL to prevent SSRF attacks
+    if (!validateUrl(this.ollamaUrl)) {
+      throw new Error('Invalid Ollama URL. Only localhost and 127.0.0.1 are allowed for security.');
+    }
+    
     this.model = options.model || 'llama3.1:8b';
     this.timeout = options.timeout || 30000;
   }
@@ -80,7 +87,7 @@ export class AiPoweredAnalysisStrategy implements HealingStrategyInterface {
 
       // Test each suggestion
       for (const suggestion of suggestions) {
-        const exists = await this.checkSelectorExists(page, suggestion.selector);
+        const exists = await checkSelectorExists(page, suggestion.selector);
         if (exists) {
           return {
             success: true,
@@ -398,17 +405,5 @@ Provide your response now:`;
       })
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, 5); // Limit to top 5
-  }
-
-  /**
-   * Check if selector exists on the page
-   */
-  private async checkSelectorExists(page: Page, selector: string): Promise<boolean> {
-    try {
-      const count = await page.locator(selector).count();
-      return count > 0;
-    } catch {
-      return false;
-    }
   }
 }

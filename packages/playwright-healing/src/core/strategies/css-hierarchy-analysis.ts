@@ -11,6 +11,7 @@ import {
   HealingStrategyInterface,
   HealingStrategyOptions,
 } from '../types';
+import { checkSelectorExists } from './utils';
 
 export class CssHierarchyAnalysisStrategy implements HealingStrategyInterface {
   readonly name = 'css-hierarchy-analysis' as const;
@@ -34,7 +35,7 @@ export class CssHierarchyAnalysisStrategy implements HealingStrategyInterface {
       }> = [];
 
       for (const candidate of candidates) {
-        const exists = await this.checkSelectorExists(page, candidate.selector);
+        const exists = await checkSelectorExists(page, candidate.selector);
         if (exists) {
           validCandidates.push(candidate);
           
@@ -322,17 +323,5 @@ export class CssHierarchyAnalysisStrategy implements HealingStrategyInterface {
         return true;
       })
       .sort((a, b) => b.confidence - a.confidence);
-  }
-
-  /**
-   * Check if selector exists on the page
-   */
-  private async checkSelectorExists(page: Page, selector: string): Promise<boolean> {
-    try {
-      const count = await page.locator(selector).count();
-      return count > 0;
-    } catch {
-      return false;
-    }
   }
 }

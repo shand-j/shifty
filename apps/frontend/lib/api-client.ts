@@ -1,470 +1,346 @@
-"use client"
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequestConfig } from "axios"
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === "true"
-
-interface AuthTokens {
-  token: string
-  refreshToken?: string
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }
 
-interface ApiClientConfig {
-  baseURL?: string
-  mockMode?: boolean
+export interface AuthResponse {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    tenantId: string;
+    firstName?: string;
+    lastName?: string;
+    persona?: string;
+  };
+  token: string;
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+    plan: string;
+    status: string;
+  };
 }
 
-interface RefreshTokenResponse {
-  token: string
-  refreshToken?: string
+export interface ApiError {
+  error: string;
+  message: string;
+  statusCode?: number;
 }
 
 class APIClient {
-  private client: AxiosInstance
-  private authTokens: AuthTokens | null = null
-  private mockMode: boolean
-  private isRefreshing = false
-  private failedQueue: Array<{
-    resolve: (value?: unknown) => void
-    reject: (reason?: unknown) => void
-  }> = []
+  private client: AxiosInstance;
+  private token: string | null = null;
+  private refreshPromise: Promise<string> | null = null;
 
-  constructor(config: ApiClientConfig = {}) {
-    this.mockMode = config.mockMode ?? MOCK_MODE
+  constructor(baseURL?: string) {
+    const apiUrl = baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
     
     this.client = axios.create({
-      baseURL: config.baseURL || API_BASE_URL,
+      baseURL: apiUrl,
       timeout: 30000,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
-    })
+    });
 
-    this.setupInterceptors()
-    this.loadTokensFromStorage()
-  }
-
-  private setupInterceptors() {
-    // Request interceptor
+    // Request interceptor - add auth token
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        // Add mock mode header
-        if (this.mockMode) {
-          config.headers["X-Mock-Mode"] = "true"
+        if (this.token && config.headers) {
+          config.headers.Authorization = `Bearer ${this.token}`;
         }
-
-        // Add auth token
-        if (this.authTokens?.token && config.headers) {
-          config.headers.Authorization = `Bearer ${this.authTokens.token}`
-        }
-
-        return config
+        return config;
       },
       (error) => Promise.reject(error)
-    )
+    );
 
-    // Response interceptor
+    // Response interceptor - handle token refresh and errors
     this.client.interceptors.response.use(
       (response) => response,
-      async (error: AxiosError) => {
-        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+      async (error: AxiosError<ApiError>) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Handle 401 errors with token refresh
+        // Handle 401 errors - token expired
         if (error.response?.status === 401 && !originalRequest._retry) {
-          if (this.isRefreshing) {
-            return new Promise((resolve, reject) => {
-              this.failedQueue.push({ resolve, reject })
-            })
-              .then(() => this.client(originalRequest))
-              .catch((err) => Promise.reject(err))
-          }
-
-          originalRequest._retry = true
-          this.isRefreshing = true
+          originalRequest._retry = true;
 
           try {
-            const newTokens = await this.refreshAccessToken()
-            this.setAuthTokens(newTokens.token, newTokens.refreshToken)
-            this.processQueue(null)
-            return this.client(originalRequest)
-          } catch (refreshError) {
-            this.processQueue(refreshError)
-            this.clearAuth()
-            if (typeof window !== "undefined") {
-              window.location.href = "/login"
+            // Attempt token refresh
+            const newToken = await this.refreshToken();
+            if (newToken && originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              return this.client(originalRequest);
             }
-            return Promise.reject(refreshError)
-          } finally {
-            this.isRefreshing = false
+          } catch (refreshError) {
+            // Token refresh failed - logout
+            this.clearToken();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+            return Promise.reject(refreshError);
           }
         }
 
-        return Promise.reject(error)
+        // Format error response
+        const apiError: ApiError = {
+          error: error.response?.data?.error || 'Request failed',
+          message: error.response?.data?.message || error.message || 'An error occurred',
+          statusCode: error.response?.status,
+        };
+
+        return Promise.reject(apiError);
       }
-    )
-  }
+    );
 
-  private processQueue(error: unknown) {
-    this.failedQueue.forEach((promise) => {
-      if (error) {
-        promise.reject(error)
-      } else {
-        promise.resolve()
+    // Load token from localStorage on client-side
+    if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem('shifty_token');
+      if (savedToken) {
+        this.token = savedToken;
       }
-    })
-    this.failedQueue = []
-  }
-
-  private loadTokensFromStorage() {
-    if (typeof window === "undefined") return
-
-    const token = localStorage.getItem("auth_token")
-    const refreshToken = localStorage.getItem("refresh_token")
-
-    if (token) {
-      this.authTokens = { token, refreshToken: refreshToken || undefined }
     }
   }
 
-  private saveTokensToStorage(token: string, refreshToken?: string) {
-    if (typeof window === "undefined") return
-
-    localStorage.setItem("auth_token", token)
-    if (refreshToken) {
-      localStorage.setItem("refresh_token", refreshToken)
+  // Token management
+  setToken(token: string) {
+    this.token = token;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('shifty_token', token);
     }
   }
 
-  private clearTokensFromStorage() {
-    if (typeof window === "undefined") return
-
-    localStorage.removeItem("auth_token")
-    localStorage.removeItem("refresh_token")
-  }
-
-  public setAuthTokens(token: string, refreshToken?: string) {
-    this.authTokens = { token, refreshToken }
-    this.saveTokensToStorage(token, refreshToken)
-  }
-
-  public clearAuth() {
-    this.authTokens = null
-    this.clearTokensFromStorage()
-  }
-
-  public getAuthToken(): string | null {
-    return this.authTokens?.token || null
-  }
-
-  public isAuthenticated(): boolean {
-    return !!this.authTokens?.token
-  }
-
-  // Auth endpoints
-  async login(credentials: { email: string; password: string }) {
-    const response = await this.client.post("/api/v1/auth/login", credentials)
-    if (response.data.token) {
-      this.setAuthTokens(response.data.token, response.data.refreshToken)
+  clearToken() {
+    this.token = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('shifty_token');
     }
-    return response.data
+  }
+
+  getToken(): string | null {
+    return this.token;
+  }
+
+  // Token refresh logic
+  private async refreshToken(): Promise<string> {
+    // Prevent multiple simultaneous refresh requests
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await axios.post<AuthResponse>(
+          `${this.client.defaults.baseURL}/api/v1/auth/refresh`,
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${this.token}`,
+            },
+          }
+        );
+
+        const newToken = response.data.token;
+        this.setToken(newToken);
+        return newToken;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  // Authentication endpoints
+  async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    const response = await this.client.post<AuthResponse>('/api/v1/auth/login', credentials);
+    this.setToken(response.data.token);
+    return response.data;
   }
 
   async register(data: {
-    email: string
-    password: string
-    firstName: string
-    lastName: string
-  }) {
-    const response = await this.client.post("/api/v1/auth/register", data)
-    if (response.data.token) {
-      this.setAuthTokens(response.data.token, response.data.refreshToken)
-    }
-    return response.data
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    tenantName?: string;
+  }): Promise<AuthResponse> {
+    const response = await this.client.post<AuthResponse>('/api/v1/auth/register', data);
+    this.setToken(response.data.token);
+    return response.data;
   }
 
-  async logout() {
+  async logout(): Promise<void> {
     try {
-      await this.client.post("/api/v1/auth/logout")
+      await this.client.post('/api/v1/auth/logout');
     } finally {
-      this.clearAuth()
+      this.clearToken();
     }
   }
 
-  async refreshAccessToken(): Promise<RefreshTokenResponse> {
-    if (!this.authTokens?.refreshToken) {
-      throw new Error("No refresh token available")
-    }
-
-    const response = await this.client.post("/api/v1/auth/refresh", {
-      refreshToken: this.authTokens.refreshToken,
-    })
-
-    return response.data
+  async verifyToken(): Promise<AuthResponse['user']> {
+    const response = await this.client.post<{ user: AuthResponse['user'] }>('/api/v1/auth/verify');
+    return response.data.user;
   }
 
   // User endpoints
-  async getCurrentUser() {
-    const response = await this.client.get("/api/v1/users/me")
-    return response.data
+  async getCurrentUser(): Promise<AuthResponse['user']> {
+    const response = await this.client.get<{ user: AuthResponse['user'] }>('/api/v1/users/me');
+    return response.data.user;
   }
 
-  async updateUser(userId: string, data: Record<string, unknown>) {
-    const response = await this.client.patch(`/api/v1/users/${userId}`, data)
-    return response.data
+  async updateUser(userId: string, data: Partial<AuthResponse['user']>): Promise<AuthResponse['user']> {
+    const response = await this.client.put<{ user: AuthResponse['user'] }>(`/api/v1/users/${userId}`, data);
+    return response.data.user;
   }
 
   // Tenant endpoints
-  async getTenants() {
-    const response = await this.client.get("/api/v1/tenants")
-    return response.data
+  async getTenants(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/tenants');
+    return response.data.data || response.data;
   }
 
-  async getTenant(tenantId: string) {
-    const response = await this.client.get(`/api/v1/tenants/${tenantId}`)
-    return response.data
+  async getTenant(tenantId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/tenants/${tenantId}`);
+    return response.data.data || response.data;
   }
 
-  async createTenant(data: { name: string; slug: string }) {
-    const response = await this.client.post("/api/v1/tenants", data)
-    return response.data
+  async createTenant(data: any): Promise<any> {
+    const response = await this.client.post('/api/v1/tenants', data);
+    return response.data.data || response.data;
   }
 
-  // Teams endpoints
-  async getTeams() {
-    const response = await this.client.get("/api/v1/teams")
-    return response.data
+  // Test generation endpoints
+  async generateTest(data: {
+    requirements: string;
+    url: string;
+    testType?: string;
+    browserType?: string;
+  }): Promise<any> {
+    const response = await this.client.post('/api/v1/tests/generate', data);
+    return response.data;
   }
 
-  async getTeam(teamId: string) {
-    const response = await this.client.get(`/api/v1/teams/${teamId}`)
-    return response.data
-  }
-
-  // Projects endpoints
-  async getProjects() {
-    const response = await this.client.get("/api/v1/projects")
-    return response.data
-  }
-
-  async getProject(projectId: string) {
-    const response = await this.client.get(`/api/v1/projects/${projectId}`)
-    return response.data
-  }
-
-  async createProject(data: Record<string, unknown>) {
-    const response = await this.client.post("/api/v1/projects", data)
-    return response.data
-  }
-
-  // Tests endpoints
-  async getTests(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/tests", { params })
-    return response.data
-  }
-
-  async getTest(testId: string) {
-    const response = await this.client.get(`/api/v1/tests/${testId}`)
-    return response.data
-  }
-
-  async generateTests(data: Record<string, unknown>) {
-    const response = await this.client.post("/api/v1/ai/generate-tests", data)
-    return response.data
+  async getGenerationStatus(jobId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/tests/generate/${jobId}/status`);
+    return response.data;
   }
 
   // Healing endpoints
-  async getHealingSuggestions(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/healing/suggestions", { params })
-    return response.data
+  async healSelector(data: {
+    url: string;
+    brokenSelector: string;
+    strategy: string;
+  }): Promise<any> {
+    const response = await this.client.post('/api/v1/healing/heal-selector', data);
+    return response.data;
   }
 
-  async approveHealing(healingId: string) {
-    const response = await this.client.post(`/api/v1/healing/${healingId}/approve`)
-    return response.data
+  async getHealingStrategies(): Promise<any> {
+    const response = await this.client.get('/api/v1/healing/strategies');
+    return response.data;
   }
 
-  async rejectHealing(healingId: string, reason?: string) {
-    const response = await this.client.post(`/api/v1/healing/${healingId}/reject`, { reason })
-    return response.data
+  async batchHeal(data: {
+    url: string;
+    selectors: Array<{ id: string; selector: string; expectedElementType: string }>;
+    browserType?: string;
+  }): Promise<any> {
+    const response = await this.client.post('/api/v1/healing/batch-heal', data);
+    return response.data;
   }
 
-  // Pipelines endpoints
-  async getPipelines(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/pipelines", { params })
-    return response.data
+  // Notifications
+  async getNotifications(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/notifications');
+    return response.data.data || response.data;
   }
 
-  async getPipeline(pipelineId: string) {
-    const response = await this.client.get(`/api/v1/pipelines/${pipelineId}`)
-    return response.data
+  async markNotificationRead(notificationId: string): Promise<void> {
+    await this.client.put(`/api/v1/notifications/${notificationId}/read`);
   }
 
-  // Sessions endpoints
-  async getSessions(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/sessions", { params })
-    return response.data
+  // Teams
+  async getTeams(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/teams');
+    return response.data.data || response.data;
   }
 
-  async getSession(sessionId: string) {
-    const response = await this.client.get(`/api/v1/sessions/${sessionId}`)
-    return response.data
+  async getTeam(teamId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/teams/${teamId}`);
+    return response.data.data || response.data;
   }
 
-  async createSession(data: Record<string, unknown>) {
-    const response = await this.client.post("/api/v1/sessions", data)
-    return response.data
+  // Projects
+  async getProjects(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/projects');
+    return response.data.data || response.data;
   }
 
-  // Dashboard/Insights endpoints
-  async getDashboardMetrics(persona?: string) {
-    const response = await this.client.get("/api/v1/insights/dashboard", {
-      params: { persona },
-    })
-    return response.data
+  async getProject(projectId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/projects/${projectId}`);
+    return response.data.data || response.data;
   }
 
-  async getROIMetrics(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/insights/roi", { params })
-    return response.data
+  // Pipelines
+  async getPipelines(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/pipelines');
+    return response.data.data || response.data;
   }
 
-  async getDORAMetrics(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/insights/dora", { params })
-    return response.data
+  async getPipeline(pipelineId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/pipelines/${pipelineId}`);
+    return response.data.data || response.data;
   }
 
-  // Notifications endpoints
-  async getNotifications() {
-    const response = await this.client.get("/api/v1/notifications")
-    return response.data
+  // Knowledge
+  async getKnowledge(params?: { type?: string; search?: string }): Promise<any[]> {
+    const response = await this.client.get('/api/v1/knowledge', { params });
+    return response.data.data || response.data;
   }
 
-  async markNotificationRead(notificationId: string) {
-    const response = await this.client.patch(`/api/v1/notifications/${notificationId}/read`)
-    return response.data
+  async getKnowledgeEntry(entryId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/knowledge/${entryId}`);
+    return response.data.data || response.data;
   }
 
-  // Knowledge base endpoints
-  async getKnowledgeEntries(params?: Record<string, unknown>) {
-    const response = await this.client.get("/api/v1/knowledge", { params })
-    return response.data
+  // ROI & Analytics
+  async getROIInsights(params?: { timeframe?: string }): Promise<any> {
+    const response = await this.client.get('/api/v1/roi/insights', { params });
+    return response.data.data || response.data;
   }
 
-  async getKnowledgeEntry(entryId: string) {
-    const response = await this.client.get(`/api/v1/knowledge/${entryId}`)
-    return response.data
+  async getDORAMetrics(params?: { timeframe?: string }): Promise<any> {
+    const response = await this.client.get('/api/v1/roi/dora', { params });
+    return response.data.data || response.data;
   }
 
-  // Arcade endpoints
-  async getArcadeMissions() {
-    const response = await this.client.get("/api/v1/arcade/missions")
-    return response.data
+  // Arcade / Gamification
+  async getMissions(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/arcade/missions');
+    return response.data.data || response.data;
   }
 
-  async getArcadeLeaderboard() {
-    const response = await this.client.get("/api/v1/arcade/leaderboard")
-    return response.data
+  async claimMission(missionId: string): Promise<any> {
+    const response = await this.client.post(`/api/v1/arcade/missions/${missionId}/claim`);
+    return response.data;
   }
 
-  // Generic request method
-  async request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
-    const response = await this.client.request<T>(config)
-    return response.data
+  async getLeaderboard(): Promise<any[]> {
+    const response = await this.client.get('/api/v1/arcade/leaderboard');
+    return response.data.data || response.data;
   }
 
-  // ==================== THIRD-PARTY INTEGRATIONS ====================
-
-  // GitHub
-  async getGitHubRepos() {
-    return this.get('/api/v1/github/repos');
-  }
-
-  async getGitHubPullRequests(owner: string, repo: string) {
-    return this.get(`/api/v1/github/repos/${owner}/${repo}/pulls`);
-  }
-
-  async getGitHubCommits(owner: string, repo: string) {
-    return this.get(`/api/v1/github/repos/${owner}/${repo}/commits`);
-  }
-
-  // Jira
-  async getJiraIssues() {
-    return this.get('/api/v1/jira/issues');
-  }
-
-  async getJiraIssue(key: string) {
-    return this.get(`/api/v1/jira/issues/${key}`);
-  }
-
-  // Slack
-  async getSlackChannels() {
-    return this.get('/api/v1/slack/channels');
-  }
-
-  async getSlackMessages(channelId: string) {
-    return this.get(`/api/v1/slack/channels/${channelId}/messages`);
-  }
-
-  // Sentry
-  async getSentryErrors() {
-    return this.get('/api/v1/sentry/errors');
-  }
-
-  // Datadog
-  async getDatadogMetrics(query?: string) {
-    return this.get('/api/v1/datadog/metrics', { params: { query } });
-  }
-
-  // Jenkins
-  async getJenkinsBuilds() {
-    return this.get('/api/v1/jenkins/builds');
-  }
-
-  async getJenkinsBuild(buildNumber: number) {
-    return this.get(`/api/v1/jenkins/builds/${buildNumber}`);
-  }
-
-  // New Relic
-  async getNewRelicAlerts() {
-    return this.get('/api/v1/newrelic/alerts');
-  }
-
-  // Notion
-  async getNotionDocuments() {
-    return this.get('/api/v1/notion/documents');
-  }
-
-  // Production Logs
-  async getProductionLogs(level?: string) {
-    return this.get('/api/v1/logs/production', { params: { level } });
-  }
-
-  // GitLab
-  async getGitLabProjects() {
-    return this.get('/api/v1/gitlab/projects');
-  }
-
-  // CircleCI
-  async getCircleCIPipelines() {
-    return this.get('/api/v1/circleci/pipelines');
-  }
-
-  // Ollama AI
-  async generateAIResponse(prompt: string) {
-    return this.post('/api/v1/ollama/generate', { prompt });
+  // Health check
+  async healthCheck(): Promise<{ status: string }> {
+    const response = await this.client.get('/health');
+    return response.data;
   }
 }
 
-// Singleton instance
-let apiClientInstance: APIClient | null = null
-
-export function getAPIClient(): APIClient {
-  if (!apiClientInstance) {
-    apiClientInstance = new APIClient()
-  }
-  return apiClientInstance
-}
-
-export { APIClient }
-export type { ApiClientConfig, AuthTokens }
+// Export singleton instance
+export const apiClient = new APIClient();
+export default apiClient;

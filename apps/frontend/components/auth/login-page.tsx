@@ -29,32 +29,29 @@ export function LoginPage() {
     setLoading(true)
 
     try {
-      const apiClient = getAPIClient()
-      const response = await apiClient.login({ email, password })
+      // Import API client dynamically to avoid SSR issues
+      const { apiClient } = await import("@/lib/api-client")
       
-      if (response.success && response.user) {
-        setUser(response.user)
-        
-        // Fetch tenant information if available
-        if (response.user.id) {
-          try {
-            const tenantsResponse = await apiClient.getTenants()
-            if (tenantsResponse.success && tenantsResponse.data?.length > 0) {
-              setTenant(tenantsResponse.data[0])
-            }
-          } catch (tenantError) {
-            console.error('Failed to fetch tenant:', tenantError)
-          }
-        }
-        
-        router.push("/dashboard")
-      } else {
-        setError(response.error || "Invalid credentials")
-      }
+      // Call login API
+      const response = await apiClient.login({
+        email: username,
+        password: password
+      })
+
+      // Set user in store
+      setUser({
+        id: response.user.id,
+        name: `${response.user.firstName} ${response.user.lastName}`,
+        email: response.user.email,
+        persona: response.user.persona as any,
+        role: response.user.role as any,
+      })
+
+      // Navigate to dashboard
+      router.push("/dashboard")
     } catch (err: any) {
-      console.error('Login error:', err)
-      setError(err.response?.data?.error || err.message || "Login failed. Please try again.")
-    } finally {
+      console.error("Login error:", err)
+      setError(err.message || "Invalid credentials. Please try again.")
       setLoading(false)
     }
   }
@@ -203,15 +200,14 @@ export function LoginPage() {
             </p>
 
             {/* Demo credentials hint */}
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground font-medium mb-2">Demo Personas:</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <div><code className="text-primary">dev@shifty.ai</code> - Developer</div>
-                <div><code className="text-primary">qa@shifty.ai</code> - QA Engineer</div>
-                <div><code className="text-primary">po@shifty.ai</code> - Product Owner</div>
-                <div><code className="text-primary">manager@shifty.ai</code> - Manager</div>
-                <div className="mt-2 text-[10px]">Password: any (mock mode)</div>
-              </div>
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
+              <p className="text-xs text-muted-foreground">
+                Demo credentials: <code className="text-primary">dev@shifty.ai</code> /{" "}
+                <code className="text-primary">password123</code>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Or try: qa@shifty.ai, po@shifty.ai, designer@shifty.ai, manager@shifty.ai
+              </p>
             </div>
           </CardContent>
         </Card>

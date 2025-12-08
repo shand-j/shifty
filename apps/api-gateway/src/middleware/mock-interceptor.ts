@@ -1,504 +1,511 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-// @ts-ignore - Import from compiled dist
-import { getMockDataStore } from '../../../packages/shared/dist/mocks/index.js';
-// @ts-ignore - Import from compiled dist
-import { MOCK_PERSONAS } from '../../../packages/shared/dist/mocks/index.js';
+// Mock interceptor middleware for API Gateway
+// Provides enterprise-scale mock data when MOCK_MODE is enabled
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { mockDataManager, MockDataStore } from '@shifty/shared/src/mocks';
 
-const MOCK_MODE = process.env.MOCK_MODE === 'true';
-const mockStore = MOCK_MODE ? getMockDataStore() : null;
-
-// Simulate realistic network delay
-function simulateDelay(): Promise<void> {
-  const delay = Math.floor(Math.random() * 250) + 50; // 50-300ms
-  return new Promise(resolve => setTimeout(resolve, delay));
+interface MockInterceptorOptions {
+  enabled: boolean;
+  latencyMin?: number;
+  latencyMax?: number;
 }
 
-export async function mockInterceptor(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
-  // Check if mock mode is enabled
-  const mockModeHeader = request.headers['x-mock-mode'] === 'true';
-  if (!MOCK_MODE && !mockModeHeader) {
-    return; // Continue to real services
+class MockInterceptor {
+  private store: MockDataStore;
+  private enabled: boolean;
+  private latencyMin: number;
+  private latencyMax: number;
+
+  constructor(options: MockInterceptorOptions) {
+    this.enabled = options.enabled;
+    this.latencyMin = options.latencyMin || 50;
+    this.latencyMax = options.latencyMax || 300;
+    
+    // Initialize mock data store
+    this.store = mockDataManager.getStore();
+    console.log(`[MockInterceptor] Initialized with ${options.enabled ? 'MOCK' : 'LIVE'} mode`);
   }
 
-  if (!mockStore) {
-    return; // No mock store available
+  /**
+   * Simulate realistic network latency
+   */
+  private async simulateLatency(): Promise<void> {
+    const delay = Math.floor(Math.random() * (this.latencyMax - this.latencyMin)) + this.latencyMin;
+    return new Promise(resolve => setTimeout(resolve, delay));
   }
 
-  await simulateDelay();
+  /**
+   * Find user by email (for login)
+   */
+  private findUserByEmail(email: string) {
+    return this.store.users.find(u => u.email === email);
+  }
 
-  const { method, url } = request;
-  const path = url.split('?')[0];
-  const queryParams = new URLSearchParams(url.split('?')[1] || '');
+  /**
+   * Find user by ID
+   */
+  private findUserById(userId: string) {
+    return this.store.users.find(u => u.id === userId);
+  }
 
-  console.log(`[MockInterceptor] ${method} ${path}`);
+  /**
+   * Generate mock JWT token
+   */
+  private generateMockToken(user: any): string {
+    // Simple base64 encoding for mock token
+    const payload = {
+      userId: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      role: user.role,
+      iat: Date.now()
+    };
+    return `mock.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+  }
 
-  try {
-    // Auth endpoints
-    if (path === '/api/v1/auth/login' && method === 'POST') {
-      const body = request.body as { email: string; password: string };
-      const user = mockStore.getUserByEmail(body.email);
+  /**
+   * Parse mock JWT token
+   */
+  private parseMockToken(token: string): any | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3 || parts[0] !== 'mock') return null;
+      return JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    } catch {
+      return null;
+    }
+  }
 
-      // Check for mock personas or any user with matching email
-      if (user) {
-        // Simple mock auth - any password works in mock mode
+  /**
+   * Handle mock authentication
+   */
+  private async handleAuth(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    // POST /api/v1/auth/login
+    if (method === 'POST' && url === '/api/v1/auth/login') {
+      await this.simulateLatency();
+      const { email, password } = request.body as any;
+
+      // Check for demo users with password "password123"
+      const user = this.findUserByEmail(email);
+      if (user && password === 'password123') {
+        const token = this.generateMockToken(user);
         reply.code(200).send({
-          success: true,
-          token: `mock-jwt-token-${user.id}`,
-          refreshToken: `mock-refresh-token-${user.id}`,
           user: {
             id: user.id,
             email: user.email,
-            name: user.name,
+            role: user.role,
+            tenantId: user.tenantId,
             firstName: user.firstName,
             lastName: user.lastName,
-            avatar: user.avatar,
-            persona: user.persona,
-            role: user.role,
+            persona: user.persona
           },
-        });
-        return;
-      } else {
-        reply.code(401).send({
-          success: false,
-          error: 'Invalid credentials',
-        });
-        return;
-      }
-    }
-
-    if (path === '/api/v1/auth/register' && method === 'POST') {
-      const body = request.body as { email: string; password: string; firstName: string; lastName: string };
-      reply.code(201).send({
-        success: true,
-        token: 'mock-jwt-token-new-user',
-        refreshToken: 'mock-refresh-token-new-user',
-        user: {
-          id: 'new-user',
-          email: body.email,
-          name: `${body.firstName} ${body.lastName}`,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          persona: 'developer',
-          role: 'member',
-        },
-      });
-      return;
-    }
-
-    if (path === '/api/v1/auth/refresh' && method === 'POST') {
-      reply.code(200).send({
-        success: true,
-        token: 'mock-jwt-token-refreshed',
-        refreshToken: 'mock-refresh-token-refreshed',
-      });
-      return;
-    }
-
-    if (path === '/api/v1/auth/logout' && method === 'POST') {
-      reply.code(200).send({ success: true });
-      return;
-    }
-
-    // User endpoints
-    if (path === '/api/v1/users/me' && method === 'GET') {
-      // Extract user from mock token
-      const authHeader = request.headers.authorization;
-      const userId = authHeader?.split('mock-jwt-token-')[1] || 'user-dev-1';
-      const user = mockStore.getUserById(userId);
-
-      if (user) {
-        reply.code(200).send({ success: true, data: user });
-        return;
-      }
-    }
-
-    if (path.match(/\/api\/v1\/users\/[^/]+$/) && method === 'PATCH') {
-      reply.code(200).send({
-        success: true,
-        data: { ...(typeof request.body === 'object' && request.body !== null ? request.body : {}), updated: true },
-      });
-      return;
-    }
-
-    // Tenant endpoints
-    if (path === '/api/v1/tenants' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: [
-          {
-            id: 'tenant-1',
+          token,
+          tenant: {
+            id: user.tenantId,
             name: 'Acme Corp',
             slug: 'acme',
             plan: 'enterprise',
-          },
-        ],
-      });
-      return;
+            status: 'active'
+          }
+        });
+        return true;
+      }
+
+      reply.code(401).send({ error: 'Invalid credentials', message: 'Email or password is incorrect' });
+      return true;
     }
 
-    // Teams endpoints
-    if (path === '/api/v1/teams' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: mockStore.teams,
-      });
-      return;
-    }
+    // POST /api/v1/auth/register
+    if (method === 'POST' && url === '/api/v1/auth/register') {
+      await this.simulateLatency();
+      const body = request.body as any;
+      
+      // Check if user already exists
+      if (this.findUserByEmail(body.email)) {
+        reply.code(409).send({ error: 'User exists', message: 'Email already registered' });
+        return true;
+      }
 
-    if (path.match(/\/api\/v1\/teams\/[^/]+$/) && method === 'GET') {
-      const teamId = path.split('/').pop();
-      const team = mockStore.getTeamById(teamId!);
-      reply.code(200).send({
-        success: true,
-        data: team,
-      });
-      return;
-    }
-
-    // Projects endpoints
-    if (path === '/api/v1/projects' && method === 'GET') {
-      const teamId = queryParams.get('teamId');
-      const projects = teamId
-        ? mockStore.getProjectsByTeam(teamId)
-        : mockStore.projects.slice(0, 50); // Limit to 50 for performance
-
-      reply.code(200).send({
-        success: true,
-        data: projects,
-        pagination: {
-          total: mockStore.projects.length,
-          page: 1,
-          limit: 50,
+      // Create new mock user
+      const newUser = {
+        id: `user-${this.store.users.length + 1}`,
+        email: body.email,
+        firstName: body.firstName,
+        lastName: body.lastName,
+        name: `${body.firstName} ${body.lastName}`,
+        persona: 'dev' as const,
+        role: 'member' as const,
+        tenantId: 'tenant-1',
+        teamId: 'team-1',
+        joinedAt: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+        xp: 0,
+        level: 1,
+        streak: 0,
+        stats: {
+          testsWritten: 0,
+          testsHealed: 0,
+          sessionsCompleted: 0,
+          hitlContributions: 0,
+          prsReviewed: 0,
+          bugsPrevented: 0,
+          avgTestQuality: 0,
+          collaborationScore: 0
         },
-      });
-      return;
-    }
+        skills: [],
+        attentionFlags: []
+      };
 
-    if (path.match(/\/api\/v1\/projects\/[^/]+$/) && method === 'GET') {
-      const projectId = path.split('/').pop();
-      const project = mockStore.getProjectById(projectId!);
-      reply.code(200).send({
-        success: true,
-        data: project,
-      });
-      return;
-    }
+      this.store.users.push(newUser);
+      const token = this.generateMockToken(newUser);
 
-    if (path === '/api/v1/projects' && method === 'POST') {
-      const newProject = mockStore.createProject(request.body as any);
       reply.code(201).send({
-        success: true,
-        data: newProject,
-      });
-      return;
-    }
-
-    // Tests endpoints
-    if (path === '/api/v1/tests' && method === 'GET') {
-      const projectId = queryParams.get('projectId');
-      const limit = parseInt(queryParams.get('limit') || '100');
-      const page = parseInt(queryParams.get('page') || '1');
-
-      const tests = projectId
-        ? mockStore.getTestsByProject(projectId)
-        : mockStore.tests;
-
-      const startIndex = (page - 1) * limit;
-      const paginatedTests = tests.slice(startIndex, startIndex + limit);
-
-      reply.code(200).send({
-        success: true,
-        data: paginatedTests,
-        pagination: {
-          total: tests.length,
-          page,
-          limit,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          role: newUser.role,
+          tenantId: newUser.tenantId,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          persona: newUser.persona
         },
+        token,
+        tenant: {
+          id: newUser.tenantId,
+          name: 'Acme Corp',
+          slug: 'acme',
+          plan: 'enterprise',
+          status: 'active'
+        }
       });
-      return;
+      return true;
     }
 
-    if (path.match(/\/api\/v1\/tests\/[^/]+$/) && method === 'GET') {
-      const testId = path.split('/').pop();
-      const test = mockStore.getTestById(testId!);
-      reply.code(200).send({
-        success: true,
-        data: test,
-      });
-      return;
-    }
-
-    if (path === '/api/v1/ai/generate-tests' && method === 'POST') {
-      reply.code(200).send({
-        success: true,
-        data: {
-          jobId: 'mock-job-id',
-          status: 'processing',
-          estimatedTime: 30,
-        },
-      });
-      return;
-    }
-
-    // Healing endpoints
-    if (path === '/api/v1/healing/suggestions' && method === 'GET') {
-      const status = queryParams.get('status');
-      const limit = parseInt(queryParams.get('limit') || '100');
-
-      let suggestions = status === 'pending'
-        ? mockStore.getPendingHealingSuggestions()
-        : mockStore.healingSuggestions;
-
-      suggestions = suggestions.slice(0, limit);
-
-      reply.code(200).send({
-        success: true,
-        data: suggestions,
-        pagination: {
-          total: mockStore.healingSuggestions.length,
-          page: 1,
-          limit,
-        },
-      });
-      return;
-    }
-
-    if (path.match(/\/api\/v1\/healing\/[^/]+\/approve$/) && method === 'POST') {
-      const healingId = path.split('/')[4];
+    // POST /api/v1/auth/verify
+    if (method === 'POST' && url === '/api/v1/auth/verify') {
+      await this.simulateLatency();
       const authHeader = request.headers.authorization;
-      const userId = authHeader?.split('mock-jwt-token-')[1] || 'user-dev-1';
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        reply.code(401).send({ error: 'Unauthorized', message: 'No token provided' });
+        return true;
+      }
 
-      mockStore.approveHealing(healingId, userId);
-      reply.code(200).send({
-        success: true,
-        data: mockStore.getHealingSuggestionById(healingId),
-      });
-      return;
-    }
+      const token = authHeader.substring(7);
+      const payload = this.parseMockToken(token);
+      if (!payload) {
+        reply.code(401).send({ error: 'Invalid token', message: 'Token is invalid or expired' });
+        return true;
+      }
 
-    if (path.match(/\/api\/v1\/healing\/[^/]+\/reject$/) && method === 'POST') {
-      const healingId = path.split('/')[4];
-      const authHeader = request.headers.authorization;
-      const userId = authHeader?.split('mock-jwt-token-')[1] || 'user-dev-1';
-
-      mockStore.rejectHealing(healingId, userId);
-      reply.code(200).send({
-        success: true,
-        data: mockStore.getHealingSuggestionById(healingId),
-      });
-      return;
-    }
-
-    // Pipelines endpoints
-    if (path === '/api/v1/pipelines' && method === 'GET') {
-      const projectId = queryParams.get('projectId');
-      const limit = parseInt(queryParams.get('limit') || '50');
-
-      const pipelines = projectId
-        ? mockStore.getPipelinesByProject(projectId)
-        : mockStore.pipelines;
+      const user = this.findUserById(payload.userId);
+      if (!user) {
+        reply.code(401).send({ error: 'User not found', message: 'User no longer exists' });
+        return true;
+      }
 
       reply.code(200).send({
-        success: true,
-        data: pipelines.slice(0, limit),
-        pagination: {
-          total: pipelines.length,
-          page: 1,
-          limit,
-        },
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          tenantId: user.tenantId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          persona: user.persona
+        }
       });
-      return;
+      return true;
     }
 
-    if (path.match(/\/api\/v1\/pipelines\/[^/]+$/) && method === 'GET') {
-      const pipelineId = path.split('/').pop();
-      const pipeline = mockStore.getPipelineById(pipelineId!);
-      reply.code(200).send({
-        success: true,
-        data: pipeline,
-      });
-      return;
-    }
-
-    // Sessions endpoints
-    if (path === '/api/v1/sessions' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: Array.from(mockStore.sessions.values()),
-      });
-      return;
-    }
-
-    if (path === '/api/v1/sessions' && method === 'POST') {
-      const session = mockStore.createSession(request.body);
-      reply.code(201).send({
-        success: true,
-        data: session,
-      });
-      return;
-    }
-
-    // Dashboard/Insights endpoints
-    if (path === '/api/v1/insights/dashboard' && method === 'GET') {
-      const persona = queryParams.get('persona') || 'developer';
-
-      reply.code(200).send({
-        success: true,
-        data: {
-          totalTests: mockStore.tests.length,
-          passingTests: mockStore.tests.filter((t: any) => t.status === 'passing').length,
-          failingTests: mockStore.tests.filter((t: any) => t.status === 'failing').length,
-          flakyTests: mockStore.tests.filter((t: any) => t.status === 'flaky').length,
-          pendingHealings: mockStore.getPendingHealingSuggestions().length,
-          activeProjects: mockStore.projects.filter((p: any) => p.status === 'active').length,
-          recentPipelines: mockStore.pipelines.slice(0, 10),
-          teamMetrics: {
-            testMaturityScore: 87,
-            automationCoverage: 78,
-            avgHealingTime: 145,
-          },
-        },
-      });
-      return;
-    }
-
-    if (path === '/api/v1/insights/roi' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: {
-          metrics: mockStore.roiMetrics,
-          summary: {
-            totalTimeSaved: mockStore.roiMetrics.reduce((sum: number, m: any) => sum + m.timeSaved, 0),
-            totalCostSaved: mockStore.roiMetrics.reduce((sum: number, m: any) => sum + m.costSaved, 0),
-            totalTestsAutomated: mockStore.roiMetrics.reduce((sum: number, m: any) => sum + m.testsAutomated, 0),
-          },
-        },
-      });
-      return;
-    }
-
-    if (path === '/api/v1/insights/dora' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: mockStore.doraMetrics,
-      });
-      return;
-    }
-
-    // Notifications endpoints
-    if (path === '/api/v1/notifications' && method === 'GET') {
-      const authHeader = request.headers.authorization;
-      const userId = authHeader?.split('mock-jwt-token-')[1] || 'user-dev-1';
-      const notifications = mockStore.getUserNotifications(userId);
-
-      reply.code(200).send({
-        success: true,
-        data: notifications,
-      });
-      return;
-    }
-
-    if (path.match(/\/api\/v1\/notifications\/[^/]+\/read$/) && method === 'PATCH') {
-      const notificationId = path.split('/')[4];
-      const authHeader = request.headers.authorization;
-      const userId = authHeader?.split('mock-jwt-token-')[1] || 'user-dev-1';
-
-      mockStore.markNotificationRead(userId, notificationId);
-      reply.code(200).send({ success: true });
-      return;
-    }
-
-    // Knowledge base endpoints
-    if (path === '/api/v1/knowledge' && method === 'GET') {
-      const limit = parseInt(queryParams.get('limit') || '50');
-      const category = queryParams.get('category');
-
-      let entries = category
-        ? mockStore.knowledgeEntries.filter((e: any) => e.category === category)
-        : mockStore.knowledgeEntries;
-
-      reply.code(200).send({
-        success: true,
-        data: entries.slice(0, limit),
-        pagination: {
-          total: entries.length,
-          page: 1,
-          limit,
-        },
-      });
-      return;
-    }
-
-    if (path.match(/\/api\/v1\/knowledge\/[^/]+$/) && method === 'GET') {
-      const entryId = path.split('/').pop();
-      const entry = mockStore.getKnowledgeEntryById(entryId!);
-      reply.code(200).send({
-        success: true,
-        data: entry,
-      });
-      return;
-    }
-
-    // Arcade endpoints
-    if (path === '/api/v1/arcade/missions' && method === 'GET') {
-      reply.code(200).send({
-        success: true,
-        data: mockStore.arcadeMissions,
-      });
-      return;
-    }
-
-    if (path === '/api/v1/arcade/leaderboard' && method === 'GET') {
-      const leaderboard = mockStore.users
-        .map((u: any) => ({
-          userId: u.id,
-          name: u.name,
-          avatar: u.avatar,
-          points: u.activityScore * 10,
-          rank: 0,
-        }))
-        .sort((a: any, b: any) => b.points - a.points)
-        .slice(0, 100)
-        .map((entry: any, index: number) => ({ ...entry, rank: index + 1 }));
-
-      reply.code(200).send({
-        success: true,
-        data: leaderboard,
-      });
-      return;
-    }
-
-    // ==================== THIRD-PARTY INTEGRATION DATA ====================
-    // Forward to integrations service in mock mode
-    
-    if (path.startsWith('/api/v1/github/') || 
-        path.startsWith('/api/v1/jira/') ||
-        path.startsWith('/api/v1/slack/') ||
-        path.startsWith('/api/v1/sentry/') ||
-        path.startsWith('/api/v1/datadog/') ||
-        path.startsWith('/api/v1/jenkins/') ||
-        path.startsWith('/api/v1/newrelic/') ||
-        path.startsWith('/api/v1/notion/') ||
-        path.startsWith('/api/v1/gitlab/') ||
-        path.startsWith('/api/v1/circleci/') ||
-        path.startsWith('/api/v1/logs/') ||
-        path.startsWith('/api/v1/ollama/')) {
-      // In mock mode, these would normally hit the integrations service
-      // For now, return a helpful message indicating the integrations service should be called
-      console.log(`[MockInterceptor] Integration endpoint ${path} - would forward to integrations service`);
-      return; // Let it pass through to integrations service
-    }
-
-    // If no mock route matched, continue to real service
-    console.log(`[MockInterceptor] No mock handler for ${method} ${path}`);
-  } catch (error) {
-    console.error('[MockInterceptor] Error:', error);
-    reply.code(500).send({
-      success: false,
-      error: 'Mock interceptor error',
-    });
+    return false;
   }
+
+  /**
+   * Handle user endpoints
+   */
+  private async handleUsers(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    // GET /api/v1/users/me
+    if (method === 'GET' && url === '/api/v1/users/me') {
+      await this.simulateLatency();
+      const authHeader = request.headers.authorization;
+      if (!authHeader) {
+        reply.code(401).send({ error: 'Unauthorized' });
+        return true;
+      }
+
+      const token = authHeader.substring(7);
+      const payload = this.parseMockToken(token);
+      const user = payload ? this.findUserById(payload.userId) : null;
+
+      if (!user) {
+        reply.code(401).send({ error: 'Unauthorized' });
+        return true;
+      }
+
+      reply.code(200).send({ user });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle tenant endpoints
+   */
+  private async handleTenants(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/tenants') {
+      await this.simulateLatency();
+      reply.code(200).send({
+        success: true,
+        data: [{
+          id: 'tenant-1',
+          name: 'Acme Corp',
+          slug: 'acme',
+          plan: 'enterprise',
+          status: 'active'
+        }]
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle notifications
+   */
+  private async handleNotifications(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/notifications') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.notifications });
+      return true;
+    }
+
+    if (method === 'PUT' && url.startsWith('/api/v1/notifications/') && url.endsWith('/read')) {
+      await this.simulateLatency();
+      const notificationId = url.split('/')[4];
+      mockDataManager.markNotificationRead(notificationId);
+      reply.code(200).send({ success: true });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle teams
+   */
+  private async handleTeams(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/teams') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.teams });
+      return true;
+    }
+
+    if (method === 'GET' && url.match(/^\/api\/v1\/teams\/[^/]+$/)) {
+      await this.simulateLatency();
+      const teamId = url.split('/')[4];
+      const team = this.store.teams.find(t => t.id === teamId);
+      if (!team) {
+        reply.code(404).send({ error: 'Team not found' });
+        return true;
+      }
+      reply.code(200).send({ data: team });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle projects
+   */
+  private async handleProjects(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/projects') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.projects });
+      return true;
+    }
+
+    if (method === 'GET' && url.match(/^\/api\/v1\/projects\/[^/]+$/)) {
+      await this.simulateLatency();
+      const projectId = url.split('/')[4];
+      const project = this.store.projects.find(p => p.id === projectId);
+      if (!project) {
+        reply.code(404).send({ error: 'Project not found' });
+        return true;
+      }
+      reply.code(200).send({ data: project });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle pipelines
+   */
+  private async handlePipelines(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/pipelines') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.pipelines });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle healing endpoints
+   */
+  private async handleHealing(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/healing/strategies') {
+      await this.simulateLatency();
+      reply.code(200).send({
+        strategies: [
+          'data-testid-recovery',
+          'text-content-matching',
+          'css-hierarchy-analysis',
+          'ai-powered-analysis'
+        ]
+      });
+      return true;
+    }
+
+    if (method === 'GET' && url === '/api/v1/healing') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.healingItems });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle knowledge endpoints
+   */
+  private async handleKnowledge(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url.startsWith('/api/v1/knowledge')) {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.knowledge.slice(0, 50) }); // Paginate
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle ROI endpoints
+   */
+  private async handleROI(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/roi/insights') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.roiInsights });
+      return true;
+    }
+
+    if (method === 'GET' && url === '/api/v1/roi/dora') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.doraMetrics });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Handle arcade endpoints
+   */
+  private async handleArcade(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    const { url, method } = request;
+
+    if (method === 'GET' && url === '/api/v1/arcade/missions') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.missions });
+      return true;
+    }
+
+    if (method === 'GET' && url === '/api/v1/arcade/leaderboard') {
+      await this.simulateLatency();
+      reply.code(200).send({ data: this.store.leaderboard });
+      return true;
+    }
+
+    if (method === 'POST' && url.match(/^\/api\/v1\/arcade\/missions\/[^/]+\/claim$/)) {
+      await this.simulateLatency();
+      const missionId = url.split('/')[5];
+      // Would get user from token in real scenario
+      mockDataManager.claimMission(missionId, 'user-1');
+      reply.code(200).send({ success: true });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Main intercept method
+   */
+  async intercept(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+    if (!this.enabled) {
+      return false;
+    }
+
+    // Try each handler
+    if (await this.handleAuth(request, reply)) return true;
+    if (await this.handleUsers(request, reply)) return true;
+    if (await this.handleTenants(request, reply)) return true;
+    if (await this.handleNotifications(request, reply)) return true;
+    if (await this.handleTeams(request, reply)) return true;
+    if (await this.handleProjects(request, reply)) return true;
+    if (await this.handlePipelines(request, reply)) return true;
+    if (await this.handleHealing(request, reply)) return true;
+    if (await this.handleKnowledge(request, reply)) return true;
+    if (await this.handleROI(request, reply)) return true;
+    if (await this.handleArcade(request, reply)) return true;
+
+    return false;
+  }
+}
+
+/**
+ * Register mock interceptor with Fastify
+ */
+export function registerMockInterceptor(fastify: FastifyInstance, options?: Partial<MockInterceptorOptions>) {
+  const mockMode = process.env.MOCK_MODE === 'true' || process.env.NODE_ENV === 'development';
+  
+  const interceptor = new MockInterceptor({
+    enabled: options?.enabled !== undefined ? options.enabled : mockMode,
+    latencyMin: options?.latencyMin,
+    latencyMax: options?.latencyMax
+  });
+
+  fastify.addHook('onRequest', async (request, reply) => {
+    const intercepted = await interceptor.intercept(request, reply);
+    if (intercepted) {
+      // Mark as handled so no proxying occurs
+      (request as any).mockIntercepted = true;
+    }
+  });
+
+  console.log(`[MockInterceptor] Registered with mock mode: ${interceptor['enabled']}`);
 }

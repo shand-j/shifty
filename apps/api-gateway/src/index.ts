@@ -271,9 +271,14 @@ class APIGateway {
       requiresAuth: false,
     },
     {
-      prefix: "/api/v1/ai",
-      target: process.env.AI_ORCHESTRATOR_URL || "http://localhost:3003",
-      requiresAuth: true,
+      prefix: '/api/v1/users',
+      target: process.env.AUTH_SERVICE_URL || 'http://localhost:3002',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/ai',
+      target: process.env.AI_ORCHESTRATOR_URL || 'http://localhost:3003',
+      requiresAuth: true
     },
     {
       prefix: "/api/v1/tests",
@@ -286,9 +291,39 @@ class APIGateway {
       requiresAuth: true,
     },
     {
-      prefix: "/api/v1/roi",
-      target: process.env.ROI_SERVICE_URL || "http://localhost:3015",
-      requiresAuth: true,
+      prefix: '/api/v1/teams',
+      target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/projects',
+      target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/pipelines',
+      target: process.env.CICD_GOVERNOR_URL || 'http://localhost:3012',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/knowledge',
+      target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/notifications',
+      target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/arcade',
+      target: process.env.HITL_ARCADE_URL || 'http://localhost:3011',
+      requiresAuth: true
+    },
+    {
+      prefix: '/api/v1/roi',
+      target: process.env.ROI_SERVICE_URL || 'http://localhost:3015',
+      requiresAuth: true
     },
     {
       prefix: "/api/v1/performance",
@@ -445,15 +480,15 @@ class APIGateway {
       console.warn("⚠️ WARNING: ALLOWED_ORIGINS not configured in production");
     }
 
+    // Default development origins - includes frontend apps
+    const defaultOrigins = [
+      'http://localhost:3010', // Next.js frontend
+      'http://localhost:3000', // API Gateway itself (for development)
+      'http://frontend:3000' // Docker network
+    ];
+
     await fastify.register(cors, {
-      origin:
-        corsOrigins.length > 0
-          ? corsOrigins
-          : [
-              "http://localhost:3010",
-              "http://localhost:3000",
-              "http://frontend:3000",
-            ],
+      origin: corsOrigins.length > 0 ? corsOrigins : defaultOrigins,
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: [
@@ -470,6 +505,15 @@ class APIGateway {
         "X-RateLimit-Reset",
       ],
       maxAge: 86400, // 24 hours
+    });
+
+    // Mock interceptor for development and testing
+    // Provides enterprise-scale mock data when MOCK_MODE=true
+    const { registerMockInterceptor } = await import('./middleware/mock-interceptor');
+    registerMockInterceptor(fastify, {
+      enabled: process.env.MOCK_MODE === 'true',
+      latencyMin: 50,
+      latencyMax: 300
     });
 
     // Rate limiting with Redis store for persistence across restarts

@@ -557,22 +557,17 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://localhost:3000
-        NEXT_PUBLIC_WS_URL: ws://localhost:3000
-        NEXT_PUBLIC_MOCK_MODE: "true"
-        NEXT_PUBLIC_ENABLE_ANALYTICS: "false"
-        NEXT_PUBLIC_ENABLE_WEBSOCKETS: "true"
     container_name: shifty-frontend
     ports:
       - "3010:3000"
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://api-gateway:3000
-      - NEXT_PUBLIC_WS_URL=ws://api-gateway:3000
       - NEXT_PUBLIC_MOCK_MODE=true
-      - NEXT_PUBLIC_ENABLE_ANALYTICS=false
-      - NEXT_PUBLIC_ENABLE_WEBSOCKETS=true
+      - NEXT_PUBLIC_WS_URL=ws://api-gateway:3000
+      - NEXT_PUBLIC_ENABLE_ARCADE=true
+      - NEXT_PUBLIC_ENABLE_KNOWLEDGE=true
+      - NEXT_PUBLIC_ENABLE_HITL=true
     depends_on:
       - api-gateway
     networks:

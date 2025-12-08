@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { DatabaseManager } from '@shifty/database';
 import { z } from 'zod';
 import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl, RequestLimits } from '@shifty/shared';
+import { AuthErrorCode, ErrorResponse, generateCorrelationId } from './errors.js';
 
 // Validate configuration on startup
 try {
@@ -159,11 +160,32 @@ class AuthService {
         });
 
       } catch (error) {
-        console.error('Registration error:', error);
+        const correlationId = generateCorrelationId();
+        
+        // Log with correlation ID and full context
+        console.error(`[${correlationId}] Registration error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: 'Invalid input', details: error.errors });
+          const errorResponse = ErrorResponse.create(
+            AuthErrorCode.INVALID_INPUT,
+            'Invalid registration data',
+            correlationId,
+            error.errors
+          );
+          return reply.status(400).send(errorResponse);
         }
-        reply.status(500).send({ error: 'Internal server error' });
+        
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INTERNAL_ERROR,
+          'Registration failed due to internal error',
+          correlationId,
+          process.env.NODE_ENV === 'development' ? error : undefined
+        );
+        reply.status(500).send(errorResponse);
       }
     });
 
@@ -205,20 +227,32 @@ class AuthService {
         });
 
       } catch (error) {
-        // MEDIUM: Generic error messages - poor developer experience
-        // FIXME: No error codes, logs, or correlation IDs for debugging
-        // TODO: Implement structured error handling:
-        //   1. Add unique error codes (AUTH_001, AUTH_002, etc.)
-        //   2. Include request correlation ID in all responses
-        //   3. Log full error with context to centralized logging
-        //   4. Return different messages for dev vs production
-        // Impact: Hard to debug, poor DX, longer incident resolution
-        // Effort: 1 day | Priority: MEDIUM
-        console.error('Login error:', error);
+        const correlationId = generateCorrelationId();
+        
+        // Log with correlation ID and full context (without sensitive data)
+        console.error(`[${correlationId}] Login error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: 'Invalid input' });
+          const errorResponse = ErrorResponse.create(
+            AuthErrorCode.INVALID_INPUT,
+            'Invalid input provided',
+            correlationId,
+            error.errors
+          );
+          return reply.status(400).send(errorResponse);
         }
-        reply.status(500).send({ error: 'Internal server error' });
+        
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INTERNAL_ERROR,
+          'Login failed due to internal error',
+          correlationId,
+          process.env.NODE_ENV === 'development' ? error : undefined
+        );
+        reply.status(500).send(errorResponse);
       }
     });
 
@@ -252,8 +286,19 @@ class AuthService {
         });
 
       } catch (error) {
-        console.error('Token verification error:', error);
-        reply.status(401).send({ error: 'Invalid token' });
+        const correlationId = generateCorrelationId();
+        
+        console.error(`[${correlationId}] Token verification error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString()
+        });
+
+        const errorResponse = ErrorResponse.create(
+          AuthErrorCode.INVALID_TOKEN,
+          'Token verification failed',
+          correlationId
+        );
+        reply.status(401).send(errorResponse);
       }
     });
 

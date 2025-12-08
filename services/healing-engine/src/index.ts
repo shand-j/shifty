@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { DatabaseManager, HealingAttemptsRepository, HealingAttemptRecord } from '@shifty/database';
 import { SelectorHealer, HealingResult as CoreHealingResult } from './core/selector-healer.js';
+import { BrowserPool } from './core/browser-pool.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { chromium, firefox, webkit, Browser, Page } from 'playwright';
@@ -87,6 +88,7 @@ class HealingEngineService {
   private dbManager: DatabaseManager;
   private selectorHealer: SelectorHealer;
   private healingRepo: HealingAttemptsRepository;
+  private browserPool: BrowserPool;
   // Configuration for tenant database URLs - in production, this would come from tenant manager
   private tenantDbUrlTemplate: string;
 
@@ -97,6 +99,8 @@ class HealingEngineService {
       ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
       model: process.env.AI_MODEL || 'llama3.1'
     });
+    // Initialize browser pool with max 10 browsers, 5 minute TTL
+    this.browserPool = new BrowserPool(10, 5);
     
     // Template for tenant database URLs
     // In production, TENANT_DB_URL_TEMPLATE must be configured
@@ -239,7 +243,7 @@ class HealingEngineService {
           return reply.send(result);
         }
 
-        const browser = await this.getBrowser(body.context?.browserType || 'chromium');
+        const browser = await this.browserPool.getBrowser(body.context?.browserType || 'chromium');
         const page = await browser.newPage();
 
         try {
@@ -291,7 +295,8 @@ class HealingEngineService {
 
         } finally {
           await page.close();
-          await browser.close();
+          // Release browser back to pool instead of closing it
+          await this.browserPool.releaseBrowser(browser);
         }
 
       } catch (error) {
@@ -598,23 +603,8 @@ class HealingEngineService {
   }
 
   private async getBrowser(browserType: 'chromium' | 'firefox' | 'webkit') {
-    // HIGH: No browser cleanup - memory leak risk
-    // FIXME: Browser instances never closed, will exhaust memory
-    // TODO: Implement browser pool with lifecycle management:
-    //   1. Create BrowserPool class with max size (e.g., 10)
-    //   2. Reuse browsers with TTL (close after 5 minutes idle)
-    //   3. Add cleanup on service shutdown
-    //   4. Track active browsers, close oldest when limit reached
-    // Impact: Memory leaks, resource exhaustion, service crashes
-    // Effort: 2 days | Priority: HIGH
-    switch (browserType) {
-      case 'firefox':
-        return await firefox.launch({ headless: true });
-      case 'webkit':
-        return await webkit.launch({ headless: true });
-      default:
-        return await chromium.launch({ headless: true });
-    }
+    // Use browser pool instead of creating new browsers
+    return await this.browserPool.getBrowser(browserType);
   }
 
   private getMockHealingResult(brokenSelector: string, strategy?: string): CoreHealingResult {
@@ -738,6 +728,8 @@ class HealingEngineService {
   }
 
   async stop() {
+    // Close browser pool first
+    await this.browserPool.closeAll();
     await this.dbManager.close();
     await fastify.close();
     console.log('Healing Engine Service stopped');

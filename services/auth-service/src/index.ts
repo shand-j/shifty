@@ -1,16 +1,21 @@
-import Fastify from 'fastify';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { DatabaseManager } from '@shifty/database';
-import { z } from 'zod';
-import { getJwtConfig, validateProductionConfig, getTenantDatabaseUrl, RequestLimits } from '@shifty/shared';
+import { DatabaseManager } from "@shifty/database";
+import {
+  getJwtConfig,
+  getTenantDatabaseUrl,
+  RequestLimits,
+  validateProductionConfig,
+} from "@shifty/shared";
+import bcrypt from "bcrypt";
+import Fastify from "fastify";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
 
 // Validate configuration on startup
 try {
   validateProductionConfig();
 } catch (error) {
-  console.error('Configuration validation failed:', error);
-  if (process.env.NODE_ENV === 'production') {
+  console.error("Configuration validation failed:", error);
+  if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 }
@@ -18,10 +23,10 @@ try {
 // Configure Fastify with proper request limits
 const fastify = Fastify({
   logger: {
-    level: process.env.LOG_LEVEL || 'info'
+    level: process.env.LOG_LEVEL || "info",
   },
   bodyLimit: RequestLimits.bodyLimit,
-  requestTimeout: RequestLimits.requestTimeout
+  requestTimeout: RequestLimits.requestTimeout,
 });
 
 // Validation schemas
@@ -30,12 +35,12 @@ const RegisterSchema = z.object({
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  tenantName: z.string().min(1).optional()
+  tenantName: z.string().min(1).optional(),
 });
 
 const LoginSchema = z.object({
   email: z.string().email(),
-  password: z.string()
+  password: z.string(),
 });
 
 interface AuthUser {
@@ -44,7 +49,7 @@ interface AuthUser {
   firstName: string;
   lastName: string;
   tenantId: string;
-  role: 'owner' | 'admin' | 'member';
+  role: "owner" | "admin" | "member";
   createdAt: Date;
 }
 
@@ -73,68 +78,58 @@ class AuthService {
       await this.registerPlugins();
       await this.registerRoutes();
 
-      const port = parseInt(process.env.PORT || '3002', 10);
-      await fastify.listen({ port, host: '0.0.0.0' });
-      
+      const port = parseInt(process.env.PORT || "3002", 10);
+      await fastify.listen({ port, host: "0.0.0.0" });
+
       console.log(`🔐 Auth Service running on port ${port}`);
     } catch (error) {
-      console.error('Failed to start Auth Service:', error);
+      console.error("Failed to start Auth Service:", error);
       process.exit(1);
     }
   }
 
   private async registerPlugins() {
-    await fastify.register(import('@fastify/cors'), {
+    await fastify.register(import("@fastify/cors"), {
       origin: true,
-      credentials: true
+      credentials: true,
     });
 
-    await fastify.register(import('@fastify/helmet'));
+    await fastify.register(import("@fastify/helmet"));
 
-    await fastify.register(import('@fastify/rate-limit'), {
+    await fastify.register(import("@fastify/rate-limit"), {
       max: 1000,
-      timeWindow: '1 minute'
+      timeWindow: "1 minute",
     });
   }
 
   private async registerRoutes() {
-    // MEDIUM: Health endpoint publicly exposed - information disclosure
-    // FIXME: No authentication, reveals service name, version, internal status
-    // TODO: Add authentication or move to internal network:
-    //   1. Add API key validation for health checks
-    //   2. Only expose /health to load balancer IP range
-    //   3. Separate public /status (minimal info) from internal /health (detailed)
-    //   4. Remove detailed error messages from public responses
-    // Impact: Attackers learn service topology, versions, dependencies
-    // Effort: 4 hours | Priority: MEDIUM
-    fastify.get('/health', async () => {
+    // Minimal health endpoint for load balancers (no sensitive info)
+    fastify.get("/health", async () => {
       return {
-        status: 'healthy',
-        service: 'auth-service',
-        timestamp: new Date().toISOString()
+        status: "healthy",
+        timestamp: new Date().toISOString(),
       };
     });
 
     // Register new user and tenant
-    fastify.post('/api/v1/auth/register', async (request, reply) => {
+    fastify.post("/api/v1/auth/register", async (request, reply) => {
       try {
         const body = RegisterSchema.parse(request.body);
-        
+
         // Check if user already exists
         const existingUser = await this.findUserByEmail(body.email);
         if (existingUser) {
-          return reply.status(409).send({ error: 'User already exists' });
+          return reply.status(409).send({ error: "User already exists" });
         }
 
-        // LOW: Bcrypt cost factor is good (12 rounds)
-        // Note: This provides adequate security for MVP
-        // TODO (post-MVP): Consider Argon2id for even better resistance to GPU attacks
+        // Bcrypt with 12 rounds provides adequate security
+        // Note: For future hardening, consider Argon2id for GPU attack resistance
         const hashedPassword = await bcrypt.hash(body.password, 12);
 
         // Create user and tenant in transaction
         const result = await this.createUserAndTenant({
           ...body,
-          password: hashedPassword
+          password: hashedPassword,
         });
 
         // Generate JWT
@@ -142,7 +137,7 @@ class AuthService {
           userId: result.user.id,
           tenantId: result.user.tenantId,
           role: result.user.role,
-          email: result.user.email
+          email: result.user.email,
         });
 
         reply.send({
@@ -152,36 +147,45 @@ class AuthService {
             firstName: result.user.firstName,
             lastName: result.user.lastName,
             tenantId: result.user.tenantId,
-            role: result.user.role
+            role: result.user.role,
           },
           token,
-          tenant: result.tenant
+          tenant: result.tenant,
         });
-
       } catch (error) {
-        console.error('Registration error:', error);
+        const correlationId = `reg-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        console.error(`[${correlationId}] Registration error:`, error);
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: 'Invalid input', details: error.errors });
+          return reply.status(400).send({
+            error: "Invalid input",
+            code: "AUTH_001",
+            correlationId,
+            details: error.errors,
+          });
         }
-        reply.status(500).send({ error: 'Internal server error' });
+        reply.status(500).send({
+          error: "Internal server error",
+          code: "AUTH_002",
+          correlationId,
+        });
       }
     });
 
     // Login
-    fastify.post('/api/v1/auth/login', async (request, reply) => {
+    fastify.post("/api/v1/auth/login", async (request, reply) => {
       try {
         const { email, password } = LoginSchema.parse(request.body);
 
         // Find user
         const user = await this.findUserByEmail(email);
         if (!user) {
-          return reply.status(401).send({ error: 'Invalid credentials' });
+          return reply.status(401).send({ error: "Invalid credentials" });
         }
 
         // Verify password
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) {
-          return reply.status(401).send({ error: 'Invalid credentials' });
+          return reply.status(401).send({ error: "Invalid credentials" });
         }
 
         // Generate JWT
@@ -189,7 +193,7 @@ class AuthService {
           userId: user.id,
           tenantId: user.tenantId,
           role: user.role,
-          email: user.email
+          email: user.email,
         });
 
         reply.send({
@@ -199,35 +203,34 @@ class AuthService {
             firstName: user.firstName,
             lastName: user.lastName,
             tenantId: user.tenantId,
-            role: user.role
+            role: user.role,
           },
-          token
+          token,
         });
-
       } catch (error) {
-        // MEDIUM: Generic error messages - poor developer experience
-        // FIXME: No error codes, logs, or correlation IDs for debugging
-        // TODO: Implement structured error handling:
-        //   1. Add unique error codes (AUTH_001, AUTH_002, etc.)
-        //   2. Include request correlation ID in all responses
-        //   3. Log full error with context to centralized logging
-        //   4. Return different messages for dev vs production
-        // Impact: Hard to debug, poor DX, longer incident resolution
-        // Effort: 1 day | Priority: MEDIUM
-        console.error('Login error:', error);
+        const correlationId = `login-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        console.error(`[${correlationId}] Login error:`, error);
         if (error instanceof z.ZodError) {
-          return reply.status(400).send({ error: 'Invalid input' });
+          return reply.status(400).send({
+            error: "Invalid input",
+            code: "AUTH_003",
+            correlationId,
+          });
         }
-        reply.status(500).send({ error: 'Internal server error' });
+        reply.status(401).send({
+          error: "Invalid credentials",
+          code: "AUTH_004",
+          correlationId,
+        });
       }
     });
 
     // Token verification endpoint
-    fastify.post('/api/v1/auth/verify', async (request, reply) => {
+    fastify.post("/api/v1/auth/verify", async (request, reply) => {
       try {
         const authHeader = request.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-          return reply.status(401).send({ error: 'Missing or invalid token' });
+        if (!authHeader?.startsWith("Bearer ")) {
+          return reply.status(401).send({ error: "Missing or invalid token" });
         }
 
         const token = authHeader.substring(7);
@@ -236,7 +239,7 @@ class AuthService {
         // Get fresh user data
         const user = await this.findUserById(decoded.userId);
         if (!user) {
-          return reply.status(401).send({ error: 'User not found' });
+          return reply.status(401).send({ error: "User not found" });
         }
 
         reply.send({
@@ -247,42 +250,44 @@ class AuthService {
             firstName: user.firstName,
             lastName: user.lastName,
             tenantId: user.tenantId,
-            role: user.role
-          }
+            role: user.role,
+          },
         });
-
       } catch (error) {
-        console.error('Token verification error:', error);
-        reply.status(401).send({ error: 'Invalid token' });
+        console.error("Token verification error:", error);
+        reply.status(401).send({ error: "Invalid token" });
       }
     });
 
     // Logout (mainly for client-side cleanup)
-    fastify.post('/api/v1/auth/logout', async (request, reply) => {
-      reply.send({ message: 'Logged out successfully' });
+    fastify.post("/api/v1/auth/logout", async (request, reply) => {
+      reply.send({ message: "Logged out successfully" });
     });
   }
 
   private generateToken(payload: AuthToken): string {
     return jwt.sign(payload, this.jwtSecret, {
-      expiresIn: '24h',
-      issuer: 'shifty-auth'
+      expiresIn: "24h",
+      issuer: "shifty-auth",
     });
   }
 
   private async findUserByEmail(email: string): Promise<any> {
     const client = await this.dbManager.getClient();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT u.*, t.name as tenant_name
         FROM users u
         JOIN tenants t ON u.tenant_id = t.id
         WHERE u.email = $1
-      `, [email]);
-      
+      `,
+        [email]
+      );
+
       const row = result.rows[0];
       if (!row) return null;
-      
+
       // Transform snake_case to camelCase
       return {
         id: row.id,
@@ -293,7 +298,7 @@ class AuthService {
         tenantId: row.tenant_id,
         role: row.role,
         createdAt: row.created_at,
-        tenantName: row.tenant_name
+        tenantName: row.tenant_name,
       };
     } finally {
       client.release();
@@ -303,16 +308,19 @@ class AuthService {
   private async findUserById(id: string): Promise<AuthUser | null> {
     const client = await this.dbManager.getClient();
     try {
-      const result = await client.query(`
+      const result = await client.query(
+        `
         SELECT u.*, t.name as tenant_name
         FROM users u
         JOIN tenants t ON u.tenant_id = t.id
         WHERE u.id = $1
-      `, [id]);
-      
+      `,
+        [id]
+      );
+
       const row = result.rows[0];
       if (!row) return null;
-      
+
       // Transform snake_case to camelCase
       return {
         id: row.id,
@@ -321,60 +329,74 @@ class AuthService {
         lastName: row.last_name,
         tenantId: row.tenant_id,
         role: row.role,
-        createdAt: row.created_at
+        createdAt: row.created_at,
       };
     } finally {
       client.release();
     }
   }
 
-  private async createUserAndTenant(userData: any): Promise<{ user: AuthUser; tenant: any }> {
+  private async createUserAndTenant(
+    userData: any
+  ): Promise<{ user: AuthUser; tenant: any }> {
     const client = await this.dbManager.getClient();
-    
+
     try {
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
       // Create tenant if specified
       let tenantId: string;
       let tenant: any;
 
       if (userData.tenantName) {
-        // First insert the tenant with a placeholder database URL, 
+        // First insert the tenant with a placeholder database URL,
         // then update with the actual URL using the generated ID
-        const tenantResult = await client.query(`
+        const tenantResult = await client.query(
+          `
           INSERT INTO tenants (id, name, slug, plan, status, region, database_url, created_at, updated_at)
           VALUES (gen_random_uuid(), $1, $2, 'starter', 'active', 'us-east-1', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
           RETURNING *
-        `, [userData.tenantName, userData.tenantName.toLowerCase().replace(/\s+/g, '-')]);
-        
+        `,
+          [
+            userData.tenantName,
+            userData.tenantName.toLowerCase().replaceAll(/\s+/g, "-"),
+          ]
+        );
+
         tenant = tenantResult.rows[0];
         tenantId = tenant.id;
-        
+
         // Update with the proper database URL using centralized config
         const tenantDbUrl = getTenantDatabaseUrl(tenantId);
-        await client.query(`
+        await client.query(
+          `
           UPDATE tenants SET database_url = $1 WHERE id = $2
-        `, [tenantDbUrl, tenantId]);
+        `,
+          [tenantDbUrl, tenantId]
+        );
         tenant.database_url = tenantDbUrl;
       } else {
-        throw new Error('Tenant name is required');
+        throw new Error("Tenant name is required");
       }
 
       // Create user
-      const userResult = await client.query(`
+      const userResult = await client.query(
+        `
         INSERT INTO users (id, email, password, first_name, last_name, tenant_id, role)
         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'owner')
         RETURNING id, email, first_name, last_name, tenant_id, role, created_at
-      `, [
-        userData.email,
-        userData.password,
-        userData.firstName,
-        userData.lastName,
-        tenantId
-      ]);
+      `,
+        [
+          userData.email,
+          userData.password,
+          userData.firstName,
+          userData.lastName,
+          tenantId,
+        ]
+      );
 
       const row = userResult.rows[0];
-      
+
       // Transform snake_case to camelCase
       const user = {
         id: row.id,
@@ -383,15 +405,14 @@ class AuthService {
         lastName: row.last_name,
         tenantId: row.tenant_id,
         role: row.role,
-        createdAt: row.created_at
+        createdAt: row.created_at,
       };
 
-      await client.query('COMMIT');
+      await client.query("COMMIT");
 
       return { user, tenant };
-      
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       throw error;
     } finally {
       client.release();
@@ -401,7 +422,7 @@ class AuthService {
   async stop() {
     await this.dbManager.close();
     await fastify.close();
-    console.log('Auth Service stopped');
+    console.log("Auth Service stopped");
   }
 }
 
@@ -409,12 +430,12 @@ const authService = new AuthService();
 authService.start();
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+process.on("SIGTERM", async () => {
   await authService.stop();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
+process.on("SIGINT", async () => {
   await authService.stop();
   process.exit(0);
 });

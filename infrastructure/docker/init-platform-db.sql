@@ -94,9 +94,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- Add seed user for development/testing
 -- Frontend tests expect test@shifty.com to exist
 -- Password: password123 (bcrypt hashed: $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7n5cWz.jSq)
+-- Note: ON CONFLICT DO NOTHING prevents errors if user already exists
 INSERT INTO users (id, tenant_id, email, password, first_name, last_name, role)
 VALUES (
-  '06313bcd-0995-4e3a-8f15-df7eb47fe7ef',
+  '06313bcd-0995-4e3a-8f15-df7eb47fe7ef',  -- Fixed UUID for consistency across environments
   (SELECT id FROM tenants LIMIT 1),
   'test@shifty.com',
   '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7n5cWz.jSq',

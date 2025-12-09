@@ -85,6 +85,14 @@ check_database() {
     
     echo -n "Checking PostgreSQL database... "
     
+    # Check if container exists first
+    if ! docker ps --format '{{.Names}}' | grep -q "^shifty-platform-db$"; then
+        echo -e "${RED}✗ Container not found${NC}"
+        echo "  ${RED}→ Run: docker-compose up -d platform-db${NC}"
+        ((FAILED_CHECKS++))
+        return 1
+    fi
+    
     if docker exec shifty-platform-db pg_isready -U postgres >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Ready${NC}"
         ((PASSED_CHECKS++))

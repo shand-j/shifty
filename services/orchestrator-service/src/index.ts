@@ -459,6 +459,12 @@ async function start() {
     console.log('[Orchestrator] Validating database schema...');
     
     for (const table of requiredTables) {
+      // Validate table name contains only alphanumeric and underscore (prevent injection)
+      if (!/^[a-z_]+$/.test(table)) {
+        console.error(`[Orchestrator] Invalid table name: ${table}`);
+        process.exit(1);
+      }
+      
       try {
         await dbManager.query(`SELECT 1 FROM ${table} LIMIT 1`);
       } catch (error) {

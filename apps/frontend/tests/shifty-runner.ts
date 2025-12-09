@@ -83,10 +83,24 @@ class ShiftyClient {
     if (this.headers['Authorization']) {
       try {
         const token = this.headers['Authorization'].replace('Bearer ', '');
-        const decoded = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        const parts = token.split('.');
+        
+        // Validate JWT structure (should have 3 parts: header.payload.signature)
+        if (parts.length !== 3) {
+          throw new Error('Invalid JWT format - expected 3 parts separated by dots');
+        }
+        
+        const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        
+        // Validate expiration
+        if (!decoded.exp) {
+          throw new Error('Token missing expiration claim');
+        }
+        
         if (decoded.exp * 1000 < Date.now()) {
           throw new Error('Token expired');
         }
+        
         const expiresAt = new Date(decoded.exp * 1000).toISOString();
         console.log(`  ✅ Authentication - Valid (expires ${expiresAt})`);
       } catch (error: any) {

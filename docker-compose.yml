@@ -217,6 +217,7 @@ services:
       - ORCHESTRATOR_SERVICE_URL=http://orchestrator-service:3022
       - RESULTS_SERVICE_URL=http://results-service:3023
       - ARTIFACT_STORAGE_URL=http://artifact-storage:3024
+      - FLAKINESS_TRACKER_URL=http://flakiness-tracker:3025
       # Testing modalities
       - ROI_SERVICE_URL=http://roi-service:3015
       - PERFORMANCE_TESTING_URL=http://performance-testing:3016
@@ -708,6 +709,28 @@ services:
         limits:
           cpus: '2'
           memory: 2G
+
+  # Flakiness Tracker Service
+  flakiness-tracker:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/flakiness-tracker
+        PACKAGE_NAME: "@shifty/flakiness-tracker"
+    container_name: shifty-flakiness-tracker
+    ports:
+      - "3025:3025"
+    environment:
+      - NODE_ENV=development
+      - PORT=3025
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
 
 volumes:
   platform_db_data:

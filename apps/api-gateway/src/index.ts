@@ -306,6 +306,11 @@ class APIGateway {
       requiresAuth: true,
     },
     {
+      prefix: "/api/v1/analytics",
+      target: process.env.FLAKINESS_TRACKER_URL || "http://localhost:3025",
+      requiresAuth: true,
+    },
+    {
       prefix: '/api/v1/teams',
       target: process.env.TENANT_MANAGER_URL || 'http://localhost:3001',
       requiresAuth: true

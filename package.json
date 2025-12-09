@@ -34,7 +34,8 @@
     "services/qe-collaborator",
     "services/results-service",
     "services/artifact-storage",
-    "services/orchestrator-service"
+    "services/orchestrator-service",
+    "services/flakiness-tracker"
   ],
   "scripts": {
     "dev": "turbo run dev",

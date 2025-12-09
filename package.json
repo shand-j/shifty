@@ -10,6 +10,7 @@
     "packages/sdk-core",
     "packages/sdk-playwright",
     "packages/sdk-observability",
+    "packages/sdk-reporter",
     "packages/playwright-healing",
     "apps/api-gateway",
     "apps/web",
@@ -30,7 +31,10 @@
     "services/security-testing",
     "services/accessibility-testing",
     "services/manual-session-hub",
-    "services/qe-collaborator"
+    "services/qe-collaborator",
+    "services/results-service",
+    "services/artifact-storage",
+    "services/orchestrator-service"
   ],
   "scripts": {
     "dev": "turbo run dev",

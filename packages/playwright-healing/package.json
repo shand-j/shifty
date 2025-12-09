@@ -1,0 +1,51 @@
+{
+  "name": "@shifty/playwright-healing",
+  "version": "1.0.0",
+  "description": "Autonomous selector healing for Playwright tests with AI-powered analysis",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "keywords": [
+    "playwright",
+    "testing",
+    "healing",
+    "automation",
+    "ai",
+    "selector",
+    "self-healing",
+    "test-automation",
+    "quality-assurance"
+  ],
+  "author": "Shifty Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shifty-ai/shifty.git",
+    "directory": "packages/playwright-healing"
+  },
+  "bugs": {
+    "url": "https://github.com/shifty-ai/shifty/issues"
+  },
+  "homepage": "https://github.com/shifty-ai/shifty/tree/main/packages/playwright-healing#readme",
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.2.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

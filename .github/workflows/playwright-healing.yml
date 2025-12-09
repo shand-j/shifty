@@ -1,0 +1,412 @@
+# Shifty Playwright Healing GitHub Action
+#
+# This workflow automatically heals broken Playwright test selectors using AI
+# when test failures are detected in your CI pipeline.
+#
+# Setup Instructions:
+#   1. Add SHIFTY_API_KEY to repository secrets
+#   2. Add SHIFTY_TENANT_ID to repository secrets  
+#   3. This workflow triggers automatically after test workflows fail
+#   4. Can also be manually triggered for specific failures
+
+name: Shifty Playwright Healing
+
+on:
+  # Automatic trigger after test workflows complete with failures
+  workflow_run:
+    workflows: ["CI", "Tests", "E2E Tests", "Playwright Tests"]
+    types: [completed]
+
+  # Manual trigger for specific test failures
+  workflow_dispatch:
+    inputs:
+      test_file:
+        description: 'Path to failing test file'
+        required: true
+        type: string
+      selector:
+        description: 'Broken selector to heal'
+        required: true
+        type: string
+      page_url:
+        description: 'URL where the selector should work'
+        required: true
+        type: string
+
+env:
+  SHIFTY_API_URL: ${{ vars.SHIFTY_API_URL || 'https://api.shifty.ai' }}
+  NODE_VERSION: '20'
+
+jobs:
+  analyze-failures:
+    name: Analyze Test Failures
+    runs-on: ubuntu-latest
+    
+    # Only run on workflow failures or manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure')
+    
+    permissions:
+      contents: read
+      actions: read
+
+    outputs:
+      has_selector_failures: ${{ steps.analyze.outputs.has_selector_failures }}
+      failures: ${{ steps.analyze.outputs.failures }}
+      failure_count: ${{ steps.analyze.outputs.failure_count }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download test artifacts
+        if: github.event_name == 'workflow_run'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id
+            });
+            
+            console.log('Available artifacts:', artifacts.data.artifacts.map(a => a.name));
+            
+            const testResultsArtifact = artifacts.data.artifacts.find(
+              a => a.name === 'test-results' || 
+                   a.name === 'playwright-report' ||
+                   a.name === 'test-artifacts'
+            );
+            
+            if (testResultsArtifact) {
+              console.log(`Downloading artifact: ${testResultsArtifact.name}`);
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: testResultsArtifact.id,
+                archive_format: 'zip'
+              });
+              
+              require('fs').writeFileSync('test-results.zip', Buffer.from(download.data));
+              console.log('Test results artifact downloaded successfully');
+            } else {
+              console.log('No test results artifacts found');
+            }
+
+      - name: Analyze test failures
+        id: analyze
+        run: |
+          echo "🔍 Analyzing test failures for selector issues..."
+          
+          if [ -f "test-results.zip" ]; then
+            unzip -q test-results.zip -d test-results || true
+            
+            # Look for selector-related failures in test output
+            # Common patterns: locator, selector, element not found, timeout, not visible
+            FAILURES=$(grep -r \
+              -E "locator|selector|element.*not found|timeout.*waiting|not visible|TimeoutError" \
+              test-results/ 2>/dev/null | head -50 || echo "")
+            
+            if [ -n "$FAILURES" ]; then
+              FAILURE_COUNT=$(echo "$FAILURES" | wc -l)
+              echo "✅ Found $FAILURE_COUNT selector-related failures"
+              echo "has_selector_failures=true" >> $GITHUB_OUTPUT
+              echo "failure_count=$FAILURE_COUNT" >> $GITHUB_OUTPUT
+              
+              # Store failures for next job (truncate to avoid size limits)
+              echo "failures<<EOF" >> $GITHUB_OUTPUT
+              echo "$FAILURES" | head -30 >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+            else
+              echo "ℹ️ No selector-related failures detected"
+              echo "has_selector_failures=false" >> $GITHUB_OUTPUT
+              echo "failure_count=0" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ No test results artifact found"
+            echo "has_selector_failures=false" >> $GITHUB_OUTPUT
+            echo "failure_count=0" >> $GITHUB_OUTPUT
+          fi
+
+  heal-selectors:
+    name: Heal Broken Selectors
+    runs-on: ubuntu-latest
+    needs: analyze-failures
+    
+    # Only run if selector failures detected or manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      needs.analyze-failures.outputs.has_selector_failures == 'true'
+    
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          npm ci
+          echo "✅ Dependencies installed"
+
+      - name: Validate configuration
+        run: |
+          echo "🔐 Validating Shifty configuration..."
+          
+          if [ -z "${{ secrets.SHIFTY_TENANT_ID }}" ]; then
+            echo "::error::SHIFTY_TENANT_ID secret is not configured"
+            echo "Please add SHIFTY_TENANT_ID to your repository secrets"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.SHIFTY_API_KEY }}" ]; then
+            echo "::error::SHIFTY_API_KEY secret is not configured"
+            echo "Please add SHIFTY_API_KEY to your repository secrets"
+            exit 1
+          fi
+          
+          echo "✅ Configuration validated"
+
+      - name: Call Shifty Healing API
+        id: heal
+        env:
+          SHIFTY_API_KEY: ${{ secrets.SHIFTY_API_KEY }}
+          SHIFTY_TENANT_ID: ${{ secrets.SHIFTY_TENANT_ID }}
+        run: |
+          echo "🤖 Requesting healing from Shifty AI..."
+          
+          SELECTOR="${{ github.event.inputs.selector }}"
+          PAGE_URL="${{ github.event.inputs.page_url }}"
+          TEST_FILE="${{ github.event.inputs.test_file }}"
+          
+          if [ -z "$SELECTOR" ]; then
+            echo "ℹ️ Auto-detection mode - analyzing failures..."
+            # TODO: Implement auto-detection from failure analysis
+            echo "⚠️ Auto-detection not yet implemented"
+            echo "Please use manual dispatch with selector specified"
+            exit 0
+          fi
+          
+          # Call Shifty Healing API
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            -X POST "${SHIFTY_API_URL}/api/v1/ci/actions/test-heal" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${SHIFTY_API_KEY}" \
+            -H "X-Tenant-ID: ${SHIFTY_TENANT_ID}" \
+            -d "{
+              \"repo\": \"${{ github.repository }}\",
+              \"commitSha\": \"${{ github.sha }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"testFile\": \"${TEST_FILE}\",
+              \"failingSelector\": \"${SELECTOR}\",
+              \"pageUrl\": \"${PAGE_URL}\",
+              \"workflowRun\": \"${{ github.run_id }}\"
+            }")
+          
+          # Extract HTTP status
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+          
+          echo "API Response Status: $HTTP_STATUS"
+          echo "API Response Body: $BODY"
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Shifty API returned status $HTTP_STATUS"
+            echo "Response: $BODY"
+            exit 1
+          fi
+          
+          # Parse response
+          SUCCESS=$(echo "$BODY" | jq -r '.success // false')
+          HEALED=$(echo "$BODY" | jq -r '.healedSelector // ""')
+          CONFIDENCE=$(echo "$BODY" | jq -r '.confidence // 0')
+          STRATEGY=$(echo "$BODY" | jq -r '.strategy // "unknown"')
+          
+          echo "success=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "healed_selector=$HEALED" >> $GITHUB_OUTPUT
+          echo "confidence=$CONFIDENCE" >> $GITHUB_OUTPUT
+          echo "strategy=$STRATEGY" >> $GITHUB_OUTPUT
+          
+          if [ "$SUCCESS" = "true" ]; then
+            echo "✅ Healing successful!"
+            echo "  Strategy: $STRATEGY"
+            echo "  Confidence: $CONFIDENCE%"
+            echo "  New Selector: $HEALED"
+          else
+            echo "❌ Healing failed - no suitable selector found"
+          fi
+
+      - name: Apply healing patch
+        if: steps.heal.outputs.success == 'true'
+        run: |
+          echo "🔧 Applying healing patch..."
+          
+          TEST_FILE="${{ github.event.inputs.test_file }}"
+          OLD_SELECTOR="${{ github.event.inputs.selector }}"
+          NEW_SELECTOR="${{ steps.heal.outputs.healed_selector }}"
+          
+          if [ ! -f "$TEST_FILE" ]; then
+            echo "::error::Test file not found: $TEST_FILE"
+            exit 1
+          fi
+          
+          # Create backup
+          cp "$TEST_FILE" "${TEST_FILE}.backup"
+          
+          # Escape special characters for sed
+          OLD_ESCAPED=$(printf '%s\n' "$OLD_SELECTOR" | sed 's/[[\.*^$()+?{|]/\\&/g')
+          NEW_ESCAPED=$(printf '%s\n' "$NEW_SELECTOR" | sed 's/[&/\]/\\&/g')
+          
+          # Apply the patch
+          sed -i "s/${OLD_ESCAPED}/${NEW_ESCAPED}/g" "$TEST_FILE"
+          
+          # Show diff
+          echo "📝 Changes applied:"
+          diff -u "${TEST_FILE}.backup" "$TEST_FILE" || true
+          
+          # Clean up backup
+          rm "${TEST_FILE}.backup"
+          
+          echo "✅ Patch applied successfully"
+
+      - name: Create Pull Request
+        if: steps.heal.outputs.success == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "fix(tests): heal broken selector with Shifty AI"
+          committer: "Shifty Bot <bot@shifty.ai>"
+          author: "Shifty Bot <bot@shifty.ai>"
+          title: "🔧 [Shifty] Auto-heal Broken Test Selector"
+          body: |
+            ## 🤖 Automated Selector Healing
+            
+            This PR was automatically generated by **Shifty's AI-powered healing engine** to fix a broken test selector.
+            
+            ### 📋 Details
+            
+            | Property | Value |
+            |----------|-------|
+            | **Test File** | `${{ github.event.inputs.test_file }}` |
+            | **Healing Strategy** | ${{ steps.heal.outputs.strategy }} |
+            | **Confidence Score** | ${{ steps.heal.outputs.confidence }}% |
+            | **Workflow Run** | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+            
+            ### 🔍 Selector Changes
+            
+            **Old Selector (Broken):**
+            ```
+            ${{ github.event.inputs.selector }}
+            ```
+            
+            **New Selector (Healed):**
+            ```
+            ${{ steps.heal.outputs.healed_selector }}
+            ```
+            
+            ### 🧪 Testing Recommendation
+            
+            1. Review the selector change to ensure it matches the intended element
+            2. Run the test locally to verify the fix works
+            3. Check that no other tests are affected by this change
+            4. Merge if all tests pass
+            
+            ### 📊 Healing Strategy Details
+            
+            **Strategy:** `${{ steps.heal.outputs.strategy }}`
+            
+            This strategy was selected based on the page structure and failure pattern. The confidence score indicates how certain the AI is that this selector will work.
+            
+            ---
+            
+            🤖 *Generated by [Shifty](https://shifty.ai) - AI-Powered Test Automation*
+          branch: shifty/heal-selector-${{ github.run_id }}
+          delete-branch: true
+          labels: |
+            shifty
+            automated
+            test-fix
+            ai-healed
+          
+      - name: Comment on failure
+        if: steps.heal.outputs.success != 'true' && github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Find the PR or issue to comment on
+            const issue_number = context.issue.number;
+            if (issue_number) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                body: `## ⚠️ Shifty Healing Failed
+                
+                The automated selector healing process could not find a suitable replacement for the broken selector.
+                
+                **Test File:** \`${{ github.event.inputs.test_file }}\`
+                **Broken Selector:** \`${{ github.event.inputs.selector }}\`
+                
+                ### Possible Reasons:
+                - The element no longer exists on the page
+                - The page structure has changed significantly
+                - The selector is too specific or complex
+                
+                ### Manual Action Required:
+                1. Inspect the page at: ${{ github.event.inputs.page_url }}
+                2. Find the correct element manually
+                3. Update the test with a more robust selector (prefer data-testid)
+                
+                🤖 *[Shifty Healing](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})*`
+              });
+            }
+
+  summary:
+    name: Healing Summary
+    runs-on: ubuntu-latest
+    needs: [analyze-failures, heal-selectors]
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# 🔧 Shifty Playwright Healing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.analyze-failures.outputs.has_selector_failures }}" = "true" ]; then
+            echo "## 📊 Analysis Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Selector Failures Detected:** Yes" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failure Count:** ${{ needs.analyze-failures.outputs.failure_count }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.heal-selectors.outputs.success }}" = "true" ]; then
+              echo "## ✅ Healing Successful" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "- **Strategy:** ${{ needs.heal-selectors.outputs.strategy }}" >> $GITHUB_STEP_SUMMARY
+              echo "- **Confidence:** ${{ needs.heal-selectors.outputs.confidence }}%" >> $GITHUB_STEP_SUMMARY
+              echo "- **PR Created:** Yes" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "## ❌ Healing Failed" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "No suitable replacement selector could be found." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "## ℹ️ No Selector Failures" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No selector-related test failures were detected in this run." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Powered by [Shifty](https://shifty.ai) - AI-Powered Test Automation*" >> $GITHUB_STEP_SUMMARY

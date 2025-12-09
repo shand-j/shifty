@@ -30,7 +30,7 @@
       "require": "./dist/index.js"
     },
     "./types": {
-      "import": "./dist/types/index.js", 
+      "import": "./dist/types/index.js",
       "require": "./dist/types/index.js"
     },
     "./utils": {

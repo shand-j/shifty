@@ -86,19 +86,19 @@ Use these emails to log in (any password works in mock mode):
 ### Basic Example
 
 ```typescript
-import { getAPIClient } from "@/lib/api-client"
+import { getAPIClient } from "@/lib/api-client";
 
-const apiClient = getAPIClient()
+const apiClient = getAPIClient();
 
 // Login
 const response = await apiClient.login({
   email: "dev@shifty.ai",
-  password: "any"
-})
+  password: "any",
+});
 
 // Authenticated requests (token is auto-added)
-const projects = await apiClient.getProjects()
-const tests = await apiClient.getTests({ projectId: "project-1" })
+const projects = await apiClient.getProjects();
+const tests = await apiClient.getTests({ projectId: "project-1" });
 ```
 
 ### In Components
@@ -132,7 +132,7 @@ export function ProjectList() {
   }, [])
 
   if (loading) return <div>Loading...</div>
-  
+
   return <div>{/* Render projects */}</div>
 }
 ```
@@ -167,27 +167,27 @@ export function MyComponent() {
 For real-time updates:
 
 ```typescript
-import { getWebSocketClient } from "@/lib/websocket-client"
+import { getWebSocketClient } from "@/lib/websocket-client";
 
-const wsClient = getWebSocketClient()
+const wsClient = getWebSocketClient();
 
 // Connect to session
-wsClient.connect(sessionId)
+wsClient.connect(sessionId);
 
 // Listen for events
 wsClient.on("test.completed", (message) => {
-  console.log("Test completed:", message.data)
+  console.log("Test completed:", message.data);
   // Update UI
-})
+});
 
 // Send events
 wsClient.send({
   type: "session.started",
-  data: { sessionId: "123" }
-})
+  data: { sessionId: "123" },
+});
 
 // Clean up
-wsClient.disconnect()
+wsClient.disconnect();
 ```
 
 ## Protected Routes
@@ -228,12 +228,14 @@ docker-compose up -d
 ### Environment Modes
 
 **Mock Mode (Default):**
+
 - Frontend uses `NEXT_PUBLIC_MOCK_MODE=true`
 - API Gateway uses `MOCK_MODE=true`
 - All API calls return mock data without hitting real services
 - Perfect for demos, frontend development, and testing
 
 **Live Mode:**
+
 - Set `MOCK_MODE=false` in API Gateway
 - Set `NEXT_PUBLIC_MOCK_MODE=false` in frontend
 - Requests hit real microservices
@@ -242,11 +244,13 @@ docker-compose up -d
 ## Testing the Integration
 
 1. **Start the stack:**
+
    ```bash
    docker-compose up
    ```
 
 2. **Open frontend:**
+
    ```bash
    open http://localhost:3010/login
    ```
@@ -266,44 +270,53 @@ docker-compose up -d
 All endpoints are prefixed with `/api/v1`:
 
 ### Authentication
+
 - `POST /auth/login` - Login with email/password
 - `POST /auth/register` - Register new user
 - `POST /auth/logout` - Logout
 - `POST /auth/refresh` - Refresh access token
 
 ### Users
+
 - `GET /users/me` - Get current user
 - `PATCH /users/:id` - Update user
 
 ### Projects
+
 - `GET /projects` - List projects (paginated)
 - `GET /projects/:id` - Get project details
 - `POST /projects` - Create project
 
 ### Tests
+
 - `GET /tests` - List tests (paginated, filterable)
 - `GET /tests/:id` - Get test details
 - `POST /ai/generate-tests` - Generate tests with AI
 
 ### Healing
+
 - `GET /healing/suggestions` - List healing suggestions
 - `POST /healing/:id/approve` - Approve healing
 - `POST /healing/:id/reject` - Reject healing
 
 ### Pipelines
+
 - `GET /pipelines` - List pipeline runs
 - `GET /pipelines/:id` - Get pipeline details
 
 ### Insights
+
 - `GET /insights/dashboard` - Dashboard metrics
 - `GET /insights/roi` - ROI metrics over time
 - `GET /insights/dora` - DORA metrics
 
 ### Knowledge
+
 - `GET /knowledge` - List knowledge entries
 - `GET /knowledge/:id` - Get knowledge entry
 
 ### Arcade
+
 - `GET /arcade/missions` - List missions
 - `GET /arcade/leaderboard` - Get leaderboard
 
@@ -312,18 +325,20 @@ All endpoints are prefixed with `/api/v1`:
 ### API Calls Fail with 401
 
 The token might be expired or invalid:
+
 ```typescript
-const apiClient = getAPIClient()
-apiClient.clearAuth()
+const apiClient = getAPIClient();
+apiClient.clearAuth();
 // Navigate to login
 ```
 
 ### CORS Errors
 
 Ensure API Gateway CORS configuration includes your frontend origin:
+
 ```typescript
 // apps/api-gateway/src/index.ts
-origin: ['http://localhost:3010', 'http://localhost:3000']
+origin: ["http://localhost:3010", "http://localhost:3000"];
 ```
 
 ### Mock Data Not Loading
@@ -335,6 +350,7 @@ origin: ['http://localhost:3010', 'http://localhost:3000']
 ### Docker Build Fails
 
 Rebuild the base image if you've updated package.json:
+
 ```bash
 docker build -f Dockerfile.base -t shifty-workspace:node20-20251205 .
 docker-compose build --no-cache

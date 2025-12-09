@@ -1,7 +1,7 @@
 // Mock interceptor middleware for API Gateway
 // Provides enterprise-scale mock data when MOCK_MODE is enabled
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { mockDataManager, MockDataStore } from '@shifty/shared/src/mocks';
+import { mockDataManager, MockDataStore } from "@shifty/shared/src/mocks";
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 interface MockInterceptorOptions {
   enabled: boolean;
@@ -19,32 +19,36 @@ class MockInterceptor {
     this.enabled = options.enabled;
     this.latencyMin = options.latencyMin || 50;
     this.latencyMax = options.latencyMax || 300;
-    
+
     // Initialize mock data store
     this.store = mockDataManager.getStore();
-    console.log(`[MockInterceptor] Initialized with ${options.enabled ? 'MOCK' : 'LIVE'} mode`);
+    console.log(
+      `[MockInterceptor] Initialized with ${options.enabled ? "MOCK" : "LIVE"} mode`
+    );
   }
 
   /**
    * Simulate realistic network latency
    */
   private async simulateLatency(): Promise<void> {
-    const delay = Math.floor(Math.random() * (this.latencyMax - this.latencyMin)) + this.latencyMin;
-    return new Promise(resolve => setTimeout(resolve, delay));
+    const delay =
+      Math.floor(Math.random() * (this.latencyMax - this.latencyMin)) +
+      this.latencyMin;
+    return new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   /**
    * Find user by email (for login)
    */
   private findUserByEmail(email: string) {
-    return this.store.users.find(u => u.email === email);
+    return this.store.users.find((u) => u.email === email);
   }
 
   /**
    * Find user by ID
    */
   private findUserById(userId: string) {
-    return this.store.users.find(u => u.id === userId);
+    return this.store.users.find((u) => u.id === userId);
   }
 
   /**
@@ -57,9 +61,9 @@ class MockInterceptor {
       email: user.email,
       tenantId: user.tenantId,
       role: user.role,
-      iat: Date.now()
+      iat: Date.now(),
     };
-    return `mock.${Buffer.from(JSON.stringify(payload)).toString('base64')}.signature`;
+    return `mock.${Buffer.from(JSON.stringify(payload)).toString("base64")}.signature`;
   }
 
   /**
@@ -67,9 +71,9 @@ class MockInterceptor {
    */
   private parseMockToken(token: string): any | null {
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3 || parts[0] !== 'mock') return null;
-      return JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      const parts = token.split(".");
+      if (parts.length !== 3 || parts[0] !== "mock") return null;
+      return JSON.parse(Buffer.from(parts[1], "base64").toString());
     } catch {
       return null;
     }
@@ -78,17 +82,20 @@ class MockInterceptor {
   /**
    * Handle mock authentication
    */
-  private async handleAuth(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleAuth(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
     // POST /api/v1/auth/login
-    if (method === 'POST' && url === '/api/v1/auth/login') {
+    if (method === "POST" && url === "/api/v1/auth/login") {
       await this.simulateLatency();
       const { email, password } = request.body as any;
 
       // Check for demo users with password "password123"
       const user = this.findUserByEmail(email);
-      if (user && password === 'password123') {
+      if (user && password === "password123") {
         const token = this.generateMockToken(user);
         reply.code(200).send({
           user: {
@@ -98,32 +105,39 @@ class MockInterceptor {
             tenantId: user.tenantId,
             firstName: user.firstName,
             lastName: user.lastName,
-            persona: user.persona
+            persona: user.persona,
           },
           token,
           tenant: {
             id: user.tenantId,
-            name: 'Acme Corp',
-            slug: 'acme',
-            plan: 'enterprise',
-            status: 'active'
-          }
+            name: "Acme Corp",
+            slug: "acme",
+            plan: "enterprise",
+            status: "active",
+          },
         });
         return true;
       }
 
-      reply.code(401).send({ error: 'Invalid credentials', message: 'Email or password is incorrect' });
+      reply
+        .code(401)
+        .send({
+          error: "Invalid credentials",
+          message: "Email or password is incorrect",
+        });
       return true;
     }
 
     // POST /api/v1/auth/register
-    if (method === 'POST' && url === '/api/v1/auth/register') {
+    if (method === "POST" && url === "/api/v1/auth/register") {
       await this.simulateLatency();
       const body = request.body as any;
-      
+
       // Check if user already exists
       if (this.findUserByEmail(body.email)) {
-        reply.code(409).send({ error: 'User exists', message: 'Email already registered' });
+        reply
+          .code(409)
+          .send({ error: "User exists", message: "Email already registered" });
         return true;
       }
 
@@ -134,10 +148,10 @@ class MockInterceptor {
         firstName: body.firstName,
         lastName: body.lastName,
         name: `${body.firstName} ${body.lastName}`,
-        persona: 'dev' as const,
-        role: 'member' as const,
-        tenantId: 'tenant-1',
-        teamId: 'team-1',
+        persona: "dev" as const,
+        role: "member" as const,
+        tenantId: "tenant-1",
+        teamId: "team-1",
         joinedAt: new Date().toISOString(),
         lastActive: new Date().toISOString(),
         xp: 0,
@@ -151,10 +165,10 @@ class MockInterceptor {
           prsReviewed: 0,
           bugsPrevented: 0,
           avgTestQuality: 0,
-          collaborationScore: 0
+          collaborationScore: 0,
         },
         skills: [],
-        attentionFlags: []
+        attentionFlags: [],
       };
 
       this.store.users.push(newUser);
@@ -168,39 +182,48 @@ class MockInterceptor {
           tenantId: newUser.tenantId,
           firstName: newUser.firstName,
           lastName: newUser.lastName,
-          persona: newUser.persona
+          persona: newUser.persona,
         },
         token,
         tenant: {
           id: newUser.tenantId,
-          name: 'Acme Corp',
-          slug: 'acme',
-          plan: 'enterprise',
-          status: 'active'
-        }
+          name: "Acme Corp",
+          slug: "acme",
+          plan: "enterprise",
+          status: "active",
+        },
       });
       return true;
     }
 
     // POST /api/v1/auth/verify
-    if (method === 'POST' && url === '/api/v1/auth/verify') {
+    if (method === "POST" && url === "/api/v1/auth/verify") {
       await this.simulateLatency();
       const authHeader = request.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        reply.code(401).send({ error: 'Unauthorized', message: 'No token provided' });
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        reply
+          .code(401)
+          .send({ error: "Unauthorized", message: "No token provided" });
         return true;
       }
 
       const token = authHeader.substring(7);
       const payload = this.parseMockToken(token);
       if (!payload) {
-        reply.code(401).send({ error: 'Invalid token', message: 'Token is invalid or expired' });
+        reply
+          .code(401)
+          .send({
+            error: "Invalid token",
+            message: "Token is invalid or expired",
+          });
         return true;
       }
 
       const user = this.findUserById(payload.userId);
       if (!user) {
-        reply.code(401).send({ error: 'User not found', message: 'User no longer exists' });
+        reply
+          .code(401)
+          .send({ error: "User not found", message: "User no longer exists" });
         return true;
       }
 
@@ -212,8 +235,8 @@ class MockInterceptor {
           tenantId: user.tenantId,
           firstName: user.firstName,
           lastName: user.lastName,
-          persona: user.persona
-        }
+          persona: user.persona,
+        },
       });
       return true;
     }
@@ -224,15 +247,18 @@ class MockInterceptor {
   /**
    * Handle user endpoints
    */
-  private async handleUsers(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleUsers(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
     // GET /api/v1/users/me
-    if (method === 'GET' && url === '/api/v1/users/me') {
+    if (method === "GET" && url === "/api/v1/users/me") {
       await this.simulateLatency();
       const authHeader = request.headers.authorization;
       if (!authHeader) {
-        reply.code(401).send({ error: 'Unauthorized' });
+        reply.code(401).send({ error: "Unauthorized" });
         return true;
       }
 
@@ -241,7 +267,7 @@ class MockInterceptor {
       const user = payload ? this.findUserById(payload.userId) : null;
 
       if (!user) {
-        reply.code(401).send({ error: 'Unauthorized' });
+        reply.code(401).send({ error: "Unauthorized" });
         return true;
       }
 
@@ -255,20 +281,25 @@ class MockInterceptor {
   /**
    * Handle tenant endpoints
    */
-  private async handleTenants(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleTenants(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/tenants') {
+    if (method === "GET" && url === "/api/v1/tenants") {
       await this.simulateLatency();
       reply.code(200).send({
         success: true,
-        data: [{
-          id: 'tenant-1',
-          name: 'Acme Corp',
-          slug: 'acme',
-          plan: 'enterprise',
-          status: 'active'
-        }]
+        data: [
+          {
+            id: "tenant-1",
+            name: "Acme Corp",
+            slug: "acme",
+            plan: "enterprise",
+            status: "active",
+          },
+        ],
       });
       return true;
     }
@@ -279,18 +310,25 @@ class MockInterceptor {
   /**
    * Handle notifications
    */
-  private async handleNotifications(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleNotifications(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/notifications') {
+    if (method === "GET" && url === "/api/v1/notifications") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.notifications });
       return true;
     }
 
-    if (method === 'PUT' && url.startsWith('/api/v1/notifications/') && url.endsWith('/read')) {
+    if (
+      method === "PUT" &&
+      url.startsWith("/api/v1/notifications/") &&
+      url.endsWith("/read")
+    ) {
       await this.simulateLatency();
-      const notificationId = url.split('/')[4];
+      const notificationId = url.split("/")[4];
       mockDataManager.markNotificationRead(notificationId);
       reply.code(200).send({ success: true });
       return true;
@@ -302,21 +340,24 @@ class MockInterceptor {
   /**
    * Handle teams
    */
-  private async handleTeams(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleTeams(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/teams') {
+    if (method === "GET" && url === "/api/v1/teams") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.teams });
       return true;
     }
 
-    if (method === 'GET' && url.match(/^\/api\/v1\/teams\/[^/]+$/)) {
+    if (method === "GET" && url.match(/^\/api\/v1\/teams\/[^/]+$/)) {
       await this.simulateLatency();
-      const teamId = url.split('/')[4];
-      const team = this.store.teams.find(t => t.id === teamId);
+      const teamId = url.split("/")[4];
+      const team = this.store.teams.find((t) => t.id === teamId);
       if (!team) {
-        reply.code(404).send({ error: 'Team not found' });
+        reply.code(404).send({ error: "Team not found" });
         return true;
       }
       reply.code(200).send({ data: team });
@@ -329,21 +370,24 @@ class MockInterceptor {
   /**
    * Handle projects
    */
-  private async handleProjects(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleProjects(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/projects') {
+    if (method === "GET" && url === "/api/v1/projects") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.projects });
       return true;
     }
 
-    if (method === 'GET' && url.match(/^\/api\/v1\/projects\/[^/]+$/)) {
+    if (method === "GET" && url.match(/^\/api\/v1\/projects\/[^/]+$/)) {
       await this.simulateLatency();
-      const projectId = url.split('/')[4];
-      const project = this.store.projects.find(p => p.id === projectId);
+      const projectId = url.split("/")[4];
+      const project = this.store.projects.find((p) => p.id === projectId);
       if (!project) {
-        reply.code(404).send({ error: 'Project not found' });
+        reply.code(404).send({ error: "Project not found" });
         return true;
       }
       reply.code(200).send({ data: project });
@@ -356,10 +400,13 @@ class MockInterceptor {
   /**
    * Handle pipelines
    */
-  private async handlePipelines(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handlePipelines(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/pipelines') {
+    if (method === "GET" && url === "/api/v1/pipelines") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.pipelines });
       return true;
@@ -371,23 +418,26 @@ class MockInterceptor {
   /**
    * Handle healing endpoints
    */
-  private async handleHealing(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleHealing(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/healing/strategies') {
+    if (method === "GET" && url === "/api/v1/healing/strategies") {
       await this.simulateLatency();
       reply.code(200).send({
         strategies: [
-          'data-testid-recovery',
-          'text-content-matching',
-          'css-hierarchy-analysis',
-          'ai-powered-analysis'
-        ]
+          "data-testid-recovery",
+          "text-content-matching",
+          "css-hierarchy-analysis",
+          "ai-powered-analysis",
+        ],
       });
       return true;
     }
 
-    if (method === 'GET' && url === '/api/v1/healing') {
+    if (method === "GET" && url === "/api/v1/healing") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.healingItems });
       return true;
@@ -399,10 +449,13 @@ class MockInterceptor {
   /**
    * Handle knowledge endpoints
    */
-  private async handleKnowledge(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleKnowledge(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url.startsWith('/api/v1/knowledge')) {
+    if (method === "GET" && url.startsWith("/api/v1/knowledge")) {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.knowledge.slice(0, 50) }); // Paginate
       return true;
@@ -414,16 +467,19 @@ class MockInterceptor {
   /**
    * Handle ROI endpoints
    */
-  private async handleROI(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleROI(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/roi/insights') {
+    if (method === "GET" && url === "/api/v1/roi/insights") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.roiInsights });
       return true;
     }
 
-    if (method === 'GET' && url === '/api/v1/roi/dora') {
+    if (method === "GET" && url === "/api/v1/roi/dora") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.doraMetrics });
       return true;
@@ -435,26 +491,32 @@ class MockInterceptor {
   /**
    * Handle arcade endpoints
    */
-  private async handleArcade(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  private async handleArcade(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     const { url, method } = request;
 
-    if (method === 'GET' && url === '/api/v1/arcade/missions') {
+    if (method === "GET" && url === "/api/v1/arcade/missions") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.missions });
       return true;
     }
 
-    if (method === 'GET' && url === '/api/v1/arcade/leaderboard') {
+    if (method === "GET" && url === "/api/v1/arcade/leaderboard") {
       await this.simulateLatency();
       reply.code(200).send({ data: this.store.leaderboard });
       return true;
     }
 
-    if (method === 'POST' && url.match(/^\/api\/v1\/arcade\/missions\/[^/]+\/claim$/)) {
+    if (
+      method === "POST" &&
+      url.match(/^\/api\/v1\/arcade\/missions\/[^/]+\/claim$/)
+    ) {
       await this.simulateLatency();
-      const missionId = url.split('/')[5];
+      const missionId = url.split("/")[5];
       // Would get user from token in real scenario
-      mockDataManager.claimMission(missionId, 'user-1');
+      mockDataManager.claimMission(missionId, "user-1");
       reply.code(200).send({ success: true });
       return true;
     }
@@ -465,7 +527,10 @@ class MockInterceptor {
   /**
    * Main intercept method
    */
-  async intercept(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
+  async intercept(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<boolean> {
     if (!this.enabled) {
       return false;
     }
@@ -490,16 +555,20 @@ class MockInterceptor {
 /**
  * Register mock interceptor with Fastify
  */
-export function registerMockInterceptor(fastify: FastifyInstance, options?: Partial<MockInterceptorOptions>) {
-  const mockMode = process.env.MOCK_MODE === 'true' || process.env.NODE_ENV === 'development';
-  
+export function registerMockInterceptor(
+  fastify: FastifyInstance,
+  options?: Partial<MockInterceptorOptions>
+) {
+  const mockMode =
+    process.env.MOCK_MODE === "true" || process.env.NODE_ENV === "development";
+
   const interceptor = new MockInterceptor({
     enabled: options?.enabled !== undefined ? options.enabled : mockMode,
     latencyMin: options?.latencyMin,
-    latencyMax: options?.latencyMax
+    latencyMax: options?.latencyMax,
   });
 
-  fastify.addHook('onRequest', async (request, reply) => {
+  fastify.addHook("onRequest", async (request, reply) => {
     const intercepted = await interceptor.intercept(request, reply);
     if (intercepted) {
       // Mark as handled so no proxying occurs
@@ -507,5 +576,7 @@ export function registerMockInterceptor(fastify: FastifyInstance, options?: Part
     }
   });
 
-  console.log(`[MockInterceptor] Registered with mock mode: ${interceptor['enabled']}`);
+  console.log(
+    `[MockInterceptor] Registered with mock mode: ${interceptor["enabled"]}`
+  );
 }

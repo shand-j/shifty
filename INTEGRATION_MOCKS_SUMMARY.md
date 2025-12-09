@@ -7,61 +7,73 @@ I've added complete mock implementations for all third-party services that Shift
 ## Available Integrations (All Mocked)
 
 ### 1. **GitHub** (`/api/v1/github/`)
+
 - ✅ 20 repositories with realistic data
 - ✅ 150+ pull requests across repos
 - ✅ Commit history with messages and authors
 - ✅ Webhook simulation support
 
 ### 2. **Jira** (`/api/v1/jira/`)
+
 - ✅ 50 issues across workflows (To Do, In Progress, Done)
 - ✅ Priorities, assignees, descriptions
 - ✅ Realistic project keys (ACME-1, ACME-2, etc.)
 
 ### 3. **Slack** (`/api/v1/slack/`)
+
 - ✅ 6 team channels (general, qa-team, engineering, etc.)
 - ✅ Message history per channel
 - ✅ Post message simulation
 
 ### 4. **Sentry** (`/api/v1/sentry/`)
+
 - ✅ 100 production errors
 - ✅ Error levels, counts, user impact
 - ✅ Stack trace simulation
 
 ### 5. **New Relic** (`/api/v1/newrelic/`)
+
 - ✅ 20 alerts (critical, warning, info)
 - ✅ Alert types: high error rate, slow response, memory, CPU
 - ✅ Application-specific alerts
 
 ### 6. **Datadog** (`/api/v1/datadog/`)
+
 - ✅ Time-series metrics (CPU, memory, requests, errors)
 - ✅ 24 hours of data points
 - ✅ Tags and metadata
 
 ### 7. **Jenkins** (`/api/v1/jenkins/`)
+
 - ✅ 100 build history entries
 - ✅ Success/failure/unstable statuses
 - ✅ Build durations and timestamps
 
 ### 8. **CircleCI** (`/api/v1/circleci/`)
+
 - ✅ 20 recent pipelines
 - ✅ Trigger info (webhook, scheduled, manual)
 - ✅ Branch and commit details
 
 ### 9. **Notion** (`/api/v1/notion/`)
+
 - ✅ 50 documents (requirements, specs, user stories)
 - ✅ Authors, tags, last edited
 - ✅ Document types and URLs
 
 ### 10. **GitLab** (`/api/v1/gitlab/`)
+
 - ✅ 15 projects
 - ✅ Star counts, forks, activity
 
 ### 11. **Production Logs** (`/api/v1/logs/`)
+
 - ✅ 100 recent log entries
 - ✅ Filterable by level (info, warn, error, debug)
 - ✅ Service attribution, trace IDs
 
 ### 12. **Ollama AI** (`/api/v1/ollama/`)
+
 - ✅ AI-generated responses with realistic latency
 - ✅ Simulates LLM processing (500-2000ms)
 - ✅ Context-aware suggestions
@@ -129,23 +141,23 @@ curl http://localhost:3000/api/v1/jenkins/builds | jq '.data | length'   # Shoul
 
 ```javascript
 // In browser console (after login)
-const api = getAPIClient()
+const api = getAPIClient();
 
 // Test GitHub
-const repos = await api.getGitHubRepos()
-console.table(repos.data)
+const repos = await api.getGitHubRepos();
+console.table(repos.data);
 
 // Test Jira
-const issues = await api.getJiraIssues()
-console.log(`${issues.data.length} issues`)
+const issues = await api.getJiraIssues();
+console.log(`${issues.data.length} issues`);
 
 // Test Sentry
-const errors = await api.getSentryErrors()
-console.table(errors.data.slice(0, 5))
+const errors = await api.getSentryErrors();
+console.table(errors.data.slice(0, 5));
 
 // Test AI
-const ai = await api.generateAIResponse('Why is this test flaky?')
-console.log(ai.data.response)
+const ai = await api.generateAIResponse("Why is this test flaky?");
+console.log(ai.data.response);
 ```
 
 ## Investor Demo Preparation
@@ -153,11 +165,13 @@ console.log(ai.data.response)
 ### Before the Demo (5 minutes)
 
 1. **Start services:**
+
    ```bash
    docker-compose up -d
    ```
 
 2. **Verify all integrations:**
+
    ```bash
    ./scripts/test-integrations.sh
    ```
@@ -206,19 +220,21 @@ Follow the script in `docs/demos/INVESTOR_DEMO_INTEGRATIONS.md`:
 ### TAM Expansion
 
 "Every integration opens a new market:
+
 - Jira → Atlassian's 250K customers
 - GitHub → Microsoft's enterprise base
 - Datadog → DevOps-first companies
-Our integration strategy IS our go-to-market strategy."
+  Our integration strategy IS our go-to-market strategy."
 
 ### Competitive Advantage
 
 "Building this integration layer took 18 months. Competitors would need:
+
 - API integrations × 12 platforms
 - Data normalization pipelines
 - AI training on multi-source data
 - Enterprise security compliance
-We're 18 months ahead with a compounding moat."
+  We're 18 months ahead with a compounding moat."
 
 ## What's NOT Implemented (Future)
 

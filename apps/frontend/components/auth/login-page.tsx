@@ -1,42 +1,47 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useAppStore } from "@/lib/store"
-import { ShiftyLogo } from "@/components/logo/shifty-logo"
-import { getAPIClient } from "@/lib/api-client"
+import { ShiftyLogo } from "@/components/logo/shifty-logo";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAppStore } from "@/lib/store";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export function LoginPage() {
-  const router = useRouter()
-  const { setUser, setTenant } = useAppStore()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const { setUser, setTenant } = useAppStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
       // Import API client dynamically to avoid SSR issues
-      const { apiClient } = await import("@/lib/api-client")
-      
+      const { apiClient } = await import("@/lib/api-client");
+
       // Call login API
       const response = await apiClient.login({
         email: username,
-        password: password
-      })
+        password: password,
+      });
 
       // Set user in store
       setUser({
@@ -45,16 +50,16 @@ export function LoginPage() {
         email: response.user.email,
         persona: response.user.persona as any,
         role: response.user.role as any,
-      })
+      });
 
       // Navigate to dashboard
-      router.push("/dashboard")
+      router.push("/dashboard");
     } catch (err: any) {
-      console.error("Login error:", err)
-      setError(err.message || "Invalid credentials. Please try again.")
-      setLoading(false)
+      console.error("Login error:", err);
+      setError(err.message || "Invalid credentials. Please try again.");
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -67,13 +72,17 @@ export function LoginPage() {
           <h1 className="text-3xl font-bold text-foreground">
             Shift<span className="text-primary">y</span>
           </h1>
-          <p className="text-muted-foreground mt-1">Quality Engineering Copilot</p>
+          <p className="text-muted-foreground mt-1">
+            Quality Engineering Copilot
+          </p>
         </div>
 
         <Card>
           <CardHeader className="text-center">
             <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Sign in to your account to continue</CardDescription>
+            <CardDescription>
+              Sign in to your account to continue
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -121,7 +130,10 @@ export function LoginPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Checkbox id="remember" />
-                  <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
+                  <Label
+                    htmlFor="remember"
+                    className="text-sm font-normal cursor-pointer"
+                  >
                     Remember me
                   </Label>
                 </div>
@@ -154,7 +166,9 @@ export function LoginPage() {
                   <div className="w-full border-t border-border" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+                  <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
                 </div>
               </div>
 
@@ -202,11 +216,13 @@ export function LoginPage() {
             {/* Demo credentials hint */}
             <div className="mt-4 p-3 bg-muted/50 rounded-lg text-center">
               <p className="text-xs text-muted-foreground">
-                Demo credentials: <code className="text-primary">dev@shifty.ai</code> /{" "}
+                Demo credentials:{" "}
+                <code className="text-primary">dev@shifty.ai</code> /{" "}
                 <code className="text-primary">password123</code>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Or try: qa@shifty.ai, po@shifty.ai, designer@shifty.ai, manager@shifty.ai
+                Or try: qa@shifty.ai, po@shifty.ai, designer@shifty.ai,
+                manager@shifty.ai
               </p>
             </div>
           </CardContent>
@@ -217,5 +233,5 @@ export function LoginPage() {
         </p>
       </div>
     </div>
-  )
+  );
 }

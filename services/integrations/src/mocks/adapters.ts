@@ -1,4 +1,4 @@
-import { faker } from '@faker-js/faker';
+import { faker } from "@faker-js/faker";
 
 // GitHub API Mock
 export interface GitHubRepo {
@@ -21,7 +21,7 @@ export interface GitHubRepo {
 export interface GitHubPullRequest {
   id: number;
   number: number;
-  state: 'open' | 'closed' | 'merged';
+  state: "open" | "closed" | "merged";
   title: string;
   body: string;
   created_at: string;
@@ -69,11 +69,11 @@ export class MockGitHubAdapter {
   private repos: GitHubRepo[] = [];
   private prs: Map<string, GitHubPullRequest[]> = new Map();
   private commits: Map<string, GitHubCommit[]> = new Map();
-  
+
   constructor() {
     this.seed();
   }
-  
+
   private seed() {
     // Generate mock repositories
     for (let i = 0; i < 20; i++) {
@@ -91,24 +91,32 @@ export class MockGitHubAdapter {
         pushed_at: faker.date.recent({ days: 7 }).toISOString(),
         stargazers_count: faker.number.int({ min: 0, max: 500 }),
         watchers_count: faker.number.int({ min: 0, max: 200 }),
-        language: faker.helpers.arrayElement(['TypeScript', 'JavaScript', 'Python', 'Go']),
-        default_branch: 'main',
+        language: faker.helpers.arrayElement([
+          "TypeScript",
+          "JavaScript",
+          "Python",
+          "Go",
+        ]),
+        default_branch: "main",
       };
-      
+
       this.repos.push(repo);
-      
+
       // Generate PRs for each repo
       const prs: GitHubPullRequest[] = [];
       for (let j = 0; j < faker.number.int({ min: 5, max: 20 }); j++) {
         prs.push({
           id: j + 1,
           number: j + 1,
-          state: faker.helpers.arrayElement(['open', 'closed', 'merged']),
+          state: faker.helpers.arrayElement(["open", "closed", "merged"]),
           title: faker.lorem.sentence(),
           body: faker.lorem.paragraphs(2),
           created_at: faker.date.recent({ days: 30 }).toISOString(),
           updated_at: faker.date.recent({ days: 15 }).toISOString(),
-          merged_at: Math.random() > 0.5 ? faker.date.recent({ days: 10 }).toISOString() : undefined,
+          merged_at:
+            Math.random() > 0.5
+              ? faker.date.recent({ days: 10 }).toISOString()
+              : undefined,
           user: {
             login: faker.internet.userName(),
             avatar_url: faker.image.avatar(),
@@ -118,13 +126,13 @@ export class MockGitHubAdapter {
             sha: faker.git.commitSha(),
           },
           base: {
-            ref: 'main',
+            ref: "main",
             sha: faker.git.commitSha(),
           },
         });
       }
       this.prs.set(repo.full_name, prs);
-      
+
       // Generate commits
       const commits: GitHubCommit[] = [];
       for (let k = 0; k < faker.number.int({ min: 20, max: 100 }); k++) {
@@ -147,26 +155,29 @@ export class MockGitHubAdapter {
       this.commits.set(repo.full_name, commits);
     }
   }
-  
+
   public getRepos(): GitHubRepo[] {
     return this.repos;
   }
-  
+
   public getRepo(owner: string, repo: string): GitHubRepo | undefined {
-    return this.repos.find(r => r.full_name === `${owner}/${repo}`);
+    return this.repos.find((r) => r.full_name === `${owner}/${repo}`);
   }
-  
+
   public getPullRequests(owner: string, repo: string): GitHubPullRequest[] {
     return this.prs.get(`${owner}/${repo}`) || [];
   }
-  
+
   public getCommits(owner: string, repo: string): GitHubCommit[] {
     return this.commits.get(`${owner}/${repo}`) || [];
   }
-  
-  public async simulateWebhook(event: string, payload: Partial<GitHubWebhookEvent>): Promise<void> {
+
+  public async simulateWebhook(
+    event: string,
+    payload: Partial<GitHubWebhookEvent>
+  ): Promise<void> {
     // Simulate webhook processing delay
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     console.log(`[MockGitHub] Webhook received: ${event}`, payload);
   }
 }
@@ -198,14 +209,21 @@ export interface SlackMessage {
 export class MockSlackAdapter {
   private channels: SlackChannel[] = [];
   private messages: Map<string, SlackMessage[]> = new Map();
-  
+
   constructor() {
     this.seed();
   }
-  
+
   private seed() {
-    const channelNames = ['general', 'qa-team', 'engineering', 'test-results', 'deployments', 'alerts'];
-    
+    const channelNames = [
+      "general",
+      "qa-team",
+      "engineering",
+      "test-results",
+      "deployments",
+      "alerts",
+    ];
+
     channelNames.forEach((name, i) => {
       const channelId = `C${faker.string.alphanumeric(10).toUpperCase()}`;
       this.channels.push({
@@ -222,7 +240,7 @@ export class MockSlackAdapter {
           value: faker.lorem.sentence(),
         },
       });
-      
+
       // Generate messages for each channel
       const messages: SlackMessage[] = [];
       for (let j = 0; j < faker.number.int({ min: 10, max: 50 }); j++) {
@@ -236,20 +254,23 @@ export class MockSlackAdapter {
       this.messages.set(channelId, messages);
     });
   }
-  
+
   public getChannels(): SlackChannel[] {
     return this.channels;
   }
-  
+
   public getMessages(channelId: string): SlackMessage[] {
     return this.messages.get(channelId) || [];
   }
-  
-  public async postMessage(channel: string, text: string): Promise<SlackMessage> {
-    await new Promise(resolve => setTimeout(resolve, 50));
+
+  public async postMessage(
+    channel: string,
+    text: string
+  ): Promise<SlackMessage> {
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const message: SlackMessage = {
       ts: Date.now().toString(),
-      user: 'UBOT',
+      user: "UBOT",
       text,
       channel,
     };
@@ -284,15 +305,15 @@ export interface JiraIssue {
 
 export class MockJiraAdapter {
   private issues: JiraIssue[] = [];
-  
+
   constructor() {
     this.seed();
   }
-  
+
   private seed() {
-    const statuses = ['To Do', 'In Progress', 'In Review', 'Done'];
-    const priorities = ['Highest', 'High', 'Medium', 'Low', 'Lowest'];
-    
+    const statuses = ["To Do", "In Progress", "In Review", "Done"];
+    const priorities = ["Highest", "High", "Medium", "Low", "Lowest"];
+
     for (let i = 0; i < 50; i++) {
       this.issues.push({
         id: `${10000 + i}`,
@@ -306,23 +327,26 @@ export class MockJiraAdapter {
           priority: {
             name: faker.helpers.arrayElement(priorities),
           },
-          assignee: Math.random() > 0.3 ? {
-            displayName: faker.person.fullName(),
-            emailAddress: faker.internet.email(),
-          } : null,
+          assignee:
+            Math.random() > 0.3
+              ? {
+                  displayName: faker.person.fullName(),
+                  emailAddress: faker.internet.email(),
+                }
+              : null,
           created: faker.date.past({ years: 1 }).toISOString(),
           updated: faker.date.recent({ days: 30 }).toISOString(),
         },
       });
     }
   }
-  
+
   public getIssues(): JiraIssue[] {
     return this.issues;
   }
-  
+
   public getIssue(key: string): JiraIssue | undefined {
-    return this.issues.find(i => i.key === key);
+    return this.issues.find((i) => i.key === key);
   }
 }
 
@@ -331,25 +355,34 @@ export interface SentryError {
   id: string;
   title: string;
   culprit: string;
-  level: 'error' | 'warning' | 'info' | 'fatal';
+  level: "error" | "warning" | "info" | "fatal";
   count: number;
   userCount: number;
   firstSeen: string;
   lastSeen: string;
-  status: 'unresolved' | 'resolved' | 'ignored';
+  status: "unresolved" | "resolved" | "ignored";
 }
 
 export class MockSentryAdapter {
   private errors: SentryError[] = [];
-  
+
   constructor() {
     this.seed();
   }
-  
+
   private seed() {
-    const levels: SentryError['level'][] = ['error', 'warning', 'info', 'fatal'];
-    const statuses: SentryError['status'][] = ['unresolved', 'resolved', 'ignored'];
-    
+    const levels: SentryError["level"][] = [
+      "error",
+      "warning",
+      "info",
+      "fatal",
+    ];
+    const statuses: SentryError["status"][] = [
+      "unresolved",
+      "resolved",
+      "ignored",
+    ];
+
     for (let i = 0; i < 100; i++) {
       this.errors.push({
         id: faker.string.uuid(),
@@ -364,7 +397,7 @@ export class MockSentryAdapter {
       });
     }
   }
-  
+
   public getErrors(): SentryError[] {
     return this.errors;
   }
@@ -374,19 +407,25 @@ export class MockSentryAdapter {
 export interface DatadogMetric {
   metric: string;
   points: Array<[number, number]>;
-  type: 'gauge' | 'rate' | 'count';
+  type: "gauge" | "rate" | "count";
   tags: string[];
 }
 
 export class MockDatadogAdapter {
   public async getMetrics(query: string): Promise<DatadogMetric[]> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Generate sample metrics
     const metrics: DatadogMetric[] = [];
-    const metricNames = ['cpu.usage', 'memory.usage', 'requests.count', 'errors.count', 'response.time'];
-    
-    metricNames.forEach(name => {
+    const metricNames = [
+      "cpu.usage",
+      "memory.usage",
+      "requests.count",
+      "errors.count",
+      "response.time",
+    ];
+
+    metricNames.forEach((name) => {
       const points: Array<[number, number]> = [];
       const now = Date.now();
       for (let i = 0; i < 24; i++) {
@@ -395,15 +434,15 @@ export class MockDatadogAdapter {
           faker.number.float({ min: 0, max: 100 }),
         ]);
       }
-      
+
       metrics.push({
         metric: name,
         points,
-        type: name.includes('count') ? 'count' : 'gauge',
-        tags: ['env:production', 'service:api'],
+        type: name.includes("count") ? "count" : "gauge",
+        tags: ["env:production", "service:api"],
       });
     });
-    
+
     return metrics;
   }
 }
@@ -411,7 +450,7 @@ export class MockDatadogAdapter {
 // Jenkins/CI Mock
 export interface JenkinsBuild {
   number: number;
-  result: 'SUCCESS' | 'FAILURE' | 'UNSTABLE' | 'ABORTED' | null;
+  result: "SUCCESS" | "FAILURE" | "UNSTABLE" | "ABORTED" | null;
   building: boolean;
   duration: number;
   timestamp: number;
@@ -420,14 +459,19 @@ export interface JenkinsBuild {
 
 export class MockJenkinsAdapter {
   private builds: JenkinsBuild[] = [];
-  
+
   constructor() {
     this.seed();
   }
-  
+
   private seed() {
-    const results: Array<JenkinsBuild['result']> = ['SUCCESS', 'FAILURE', 'UNSTABLE', null];
-    
+    const results: Array<JenkinsBuild["result"]> = [
+      "SUCCESS",
+      "FAILURE",
+      "UNSTABLE",
+      null,
+    ];
+
     for (let i = 0; i < 100; i++) {
       this.builds.push({
         number: i + 1,
@@ -439,13 +483,13 @@ export class MockJenkinsAdapter {
       });
     }
   }
-  
+
   public getBuilds(): JenkinsBuild[] {
     return this.builds;
   }
-  
+
   public getBuild(buildNumber: number): JenkinsBuild | undefined {
-    return this.builds.find(b => b.number === buildNumber);
+    return this.builds.find((b) => b.number === buildNumber);
   }
 }
 
@@ -460,18 +504,20 @@ export interface OllamaResponse {
 export class MockOllamaAdapter {
   public async generate(prompt: string): Promise<OllamaResponse> {
     // Simulate LLM processing time
-    await new Promise(resolve => setTimeout(resolve, faker.number.int({ min: 500, max: 2000 })));
-    
+    await new Promise((resolve) =>
+      setTimeout(resolve, faker.number.int({ min: 500, max: 2000 }))
+    );
+
     // Generate realistic-looking AI response
     const responses = [
-      'Based on the test failure patterns, I recommend updating the selector to use data-testid attributes for better stability.',
-      'The flaky test appears to be caused by timing issues. Consider adding explicit waits before the assertion.',
-      'This selector can be improved by using a more specific CSS selector that targets the unique attributes of the element.',
-      'The test is failing due to DOM changes. I suggest using a combination of role and text-based selectors for better resilience.',
+      "Based on the test failure patterns, I recommend updating the selector to use data-testid attributes for better stability.",
+      "The flaky test appears to be caused by timing issues. Consider adding explicit waits before the assertion.",
+      "This selector can be improved by using a more specific CSS selector that targets the unique attributes of the element.",
+      "The test is failing due to DOM changes. I suggest using a combination of role and text-based selectors for better resilience.",
     ];
-    
+
     return {
-      model: 'llama3.1:8b',
+      model: "llama3.1:8b",
       created_at: new Date().toISOString(),
       response: faker.helpers.arrayElement(responses),
       done: true,

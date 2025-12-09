@@ -1,4 +1,8 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  InternalAxiosRequestConfig,
+} from "axios";
 
 export interface LoginCredentials {
   email: string;
@@ -37,13 +41,14 @@ class APIClient {
   private refreshPromise: Promise<string> | null = null;
 
   constructor(baseURL?: string) {
-    const apiUrl = baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-    
+    const apiUrl =
+      baseURL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
     this.client = axios.create({
       baseURL: apiUrl,
       timeout: 30000,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
@@ -62,7 +67,9 @@ class APIClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<ApiError>) => {
-        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+        const originalRequest = error.config as InternalAxiosRequestConfig & {
+          _retry?: boolean;
+        };
 
         // Handle 401 errors - token expired
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -78,8 +85,8 @@ class APIClient {
           } catch (refreshError) {
             // Token refresh failed - logout
             this.clearToken();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
+            if (typeof window !== "undefined") {
+              window.location.href = "/login";
             }
             return Promise.reject(refreshError);
           }
@@ -87,8 +94,11 @@ class APIClient {
 
         // Format error response
         const apiError: ApiError = {
-          error: error.response?.data?.error || 'Request failed',
-          message: error.response?.data?.message || error.message || 'An error occurred',
+          error: error.response?.data?.error || "Request failed",
+          message:
+            error.response?.data?.message ||
+            error.message ||
+            "An error occurred",
           statusCode: error.response?.status,
         };
 
@@ -97,8 +107,8 @@ class APIClient {
     );
 
     // Load token from localStorage on client-side
-    if (typeof window !== 'undefined') {
-      const savedToken = localStorage.getItem('shifty_token');
+    if (typeof window !== "undefined") {
+      const savedToken = localStorage.getItem("shifty_token");
       if (savedToken) {
         this.token = savedToken;
       }
@@ -108,15 +118,15 @@ class APIClient {
   // Token management
   setToken(token: string) {
     this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('shifty_token', token);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("shifty_token", token);
     }
   }
 
   clearToken() {
     this.token = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('shifty_token');
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("shifty_token");
     }
   }
 
@@ -156,7 +166,10 @@ class APIClient {
 
   // Authentication endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.client.post<AuthResponse>('/api/v1/auth/login', credentials);
+    const response = await this.client.post<AuthResponse>(
+      "/api/v1/auth/login",
+      credentials
+    );
     this.setToken(response.data.token);
     return response.data;
   }
@@ -168,38 +181,51 @@ class APIClient {
     lastName: string;
     tenantName?: string;
   }): Promise<AuthResponse> {
-    const response = await this.client.post<AuthResponse>('/api/v1/auth/register', data);
+    const response = await this.client.post<AuthResponse>(
+      "/api/v1/auth/register",
+      data
+    );
     this.setToken(response.data.token);
     return response.data;
   }
 
   async logout(): Promise<void> {
     try {
-      await this.client.post('/api/v1/auth/logout');
+      await this.client.post("/api/v1/auth/logout");
     } finally {
       this.clearToken();
     }
   }
 
-  async verifyToken(): Promise<AuthResponse['user']> {
-    const response = await this.client.post<{ user: AuthResponse['user'] }>('/api/v1/auth/verify');
+  async verifyToken(): Promise<AuthResponse["user"]> {
+    const response = await this.client.post<{ user: AuthResponse["user"] }>(
+      "/api/v1/auth/verify"
+    );
     return response.data.user;
   }
 
   // User endpoints
-  async getCurrentUser(): Promise<AuthResponse['user']> {
-    const response = await this.client.get<{ user: AuthResponse['user'] }>('/api/v1/users/me');
+  async getCurrentUser(): Promise<AuthResponse["user"]> {
+    const response = await this.client.get<{ user: AuthResponse["user"] }>(
+      "/api/v1/users/me"
+    );
     return response.data.user;
   }
 
-  async updateUser(userId: string, data: Partial<AuthResponse['user']>): Promise<AuthResponse['user']> {
-    const response = await this.client.put<{ user: AuthResponse['user'] }>(`/api/v1/users/${userId}`, data);
+  async updateUser(
+    userId: string,
+    data: Partial<AuthResponse["user"]>
+  ): Promise<AuthResponse["user"]> {
+    const response = await this.client.put<{ user: AuthResponse["user"] }>(
+      `/api/v1/users/${userId}`,
+      data
+    );
     return response.data.user;
   }
 
   // Tenant endpoints
   async getTenants(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/tenants');
+    const response = await this.client.get("/api/v1/tenants");
     return response.data.data || response.data;
   }
 
@@ -209,7 +235,7 @@ class APIClient {
   }
 
   async createTenant(data: any): Promise<any> {
-    const response = await this.client.post('/api/v1/tenants', data);
+    const response = await this.client.post("/api/v1/tenants", data);
     return response.data.data || response.data;
   }
 
@@ -220,12 +246,14 @@ class APIClient {
     testType?: string;
     browserType?: string;
   }): Promise<any> {
-    const response = await this.client.post('/api/v1/tests/generate', data);
+    const response = await this.client.post("/api/v1/tests/generate", data);
     return response.data;
   }
 
   async getGenerationStatus(jobId: string): Promise<any> {
-    const response = await this.client.get(`/api/v1/tests/generate/${jobId}/status`);
+    const response = await this.client.get(
+      `/api/v1/tests/generate/${jobId}/status`
+    );
     return response.data;
   }
 
@@ -235,27 +263,34 @@ class APIClient {
     brokenSelector: string;
     strategy: string;
   }): Promise<any> {
-    const response = await this.client.post('/api/v1/healing/heal-selector', data);
+    const response = await this.client.post(
+      "/api/v1/healing/heal-selector",
+      data
+    );
     return response.data;
   }
 
   async getHealingStrategies(): Promise<any> {
-    const response = await this.client.get('/api/v1/healing/strategies');
+    const response = await this.client.get("/api/v1/healing/strategies");
     return response.data;
   }
 
   async batchHeal(data: {
     url: string;
-    selectors: Array<{ id: string; selector: string; expectedElementType: string }>;
+    selectors: Array<{
+      id: string;
+      selector: string;
+      expectedElementType: string;
+    }>;
     browserType?: string;
   }): Promise<any> {
-    const response = await this.client.post('/api/v1/healing/batch-heal', data);
+    const response = await this.client.post("/api/v1/healing/batch-heal", data);
     return response.data;
   }
 
   // Notifications
   async getNotifications(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/notifications');
+    const response = await this.client.get("/api/v1/notifications");
     return response.data.data || response.data;
   }
 
@@ -265,7 +300,7 @@ class APIClient {
 
   // Teams
   async getTeams(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/teams');
+    const response = await this.client.get("/api/v1/teams");
     return response.data.data || response.data;
   }
 
@@ -276,7 +311,7 @@ class APIClient {
 
   // Projects
   async getProjects(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/projects');
+    const response = await this.client.get("/api/v1/projects");
     return response.data.data || response.data;
   }
 
@@ -287,7 +322,7 @@ class APIClient {
 
   // Pipelines
   async getPipelines(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/pipelines');
+    const response = await this.client.get("/api/v1/pipelines");
     return response.data.data || response.data;
   }
 
@@ -297,8 +332,11 @@ class APIClient {
   }
 
   // Knowledge
-  async getKnowledge(params?: { type?: string; search?: string }): Promise<any[]> {
-    const response = await this.client.get('/api/v1/knowledge', { params });
+  async getKnowledge(params?: {
+    type?: string;
+    search?: string;
+  }): Promise<any[]> {
+    const response = await this.client.get("/api/v1/knowledge", { params });
     return response.data.data || response.data;
   }
 
@@ -309,34 +347,36 @@ class APIClient {
 
   // ROI & Analytics
   async getROIInsights(params?: { timeframe?: string }): Promise<any> {
-    const response = await this.client.get('/api/v1/roi/insights', { params });
+    const response = await this.client.get("/api/v1/roi/insights", { params });
     return response.data.data || response.data;
   }
 
   async getDORAMetrics(params?: { timeframe?: string }): Promise<any> {
-    const response = await this.client.get('/api/v1/roi/dora', { params });
+    const response = await this.client.get("/api/v1/roi/dora", { params });
     return response.data.data || response.data;
   }
 
   // Arcade / Gamification
   async getMissions(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/arcade/missions');
+    const response = await this.client.get("/api/v1/arcade/missions");
     return response.data.data || response.data;
   }
 
   async claimMission(missionId: string): Promise<any> {
-    const response = await this.client.post(`/api/v1/arcade/missions/${missionId}/claim`);
+    const response = await this.client.post(
+      `/api/v1/arcade/missions/${missionId}/claim`
+    );
     return response.data;
   }
 
   async getLeaderboard(): Promise<any[]> {
-    const response = await this.client.get('/api/v1/arcade/leaderboard');
+    const response = await this.client.get("/api/v1/arcade/leaderboard");
     return response.data.data || response.data;
   }
 
   // Health check
   async healthCheck(): Promise<{ status: string }> {
-    const response = await this.client.get('/health');
+    const response = await this.client.get("/health");
     return response.data;
   }
 }

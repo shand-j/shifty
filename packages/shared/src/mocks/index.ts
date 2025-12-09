@@ -1,13 +1,30 @@
 // Centralized mock data store for the entire platform
-import { generateMockUsers, MockUser } from './users';
-import { generateMockTeams, MockTeam, assignUsersToTeams, assignProjectsToTeams } from './teams';
-import { generateMockProjects, MockProject } from './projects';
-import { generateMockHealingItems, MockHealingItem } from './healing';
-import { generateMockPipelines, MockPipeline } from './pipelines';
-import { generateMockKnowledge, MockKnowledgeEntry } from './knowledge';
-import { generateMockMissions, generateMockLeaderboard, generateMockBadges, MockMission, MockLeaderboardEntry, MockBadge } from './arcade';
-import { generateMockROIInsights, generateMockDORAMetrics, MockROIInsights, MockDORAMetrics } from './roi';
-import { generateMockNotifications, MockNotification } from './notifications';
+import {
+  generateMockBadges,
+  generateMockLeaderboard,
+  generateMockMissions,
+  MockBadge,
+  MockLeaderboardEntry,
+  MockMission,
+} from "./arcade";
+import { generateMockHealingItems, MockHealingItem } from "./healing";
+import { generateMockKnowledge, MockKnowledgeEntry } from "./knowledge";
+import { generateMockNotifications, MockNotification } from "./notifications";
+import { generateMockPipelines, MockPipeline } from "./pipelines";
+import { generateMockProjects, MockProject } from "./projects";
+import {
+  generateMockDORAMetrics,
+  generateMockROIInsights,
+  MockDORAMetrics,
+  MockROIInsights,
+} from "./roi";
+import {
+  assignProjectsToTeams,
+  assignUsersToTeams,
+  generateMockTeams,
+  MockTeam,
+} from "./teams";
+import { generateMockUsers, MockUser } from "./users";
 
 export interface MockDataStore {
   users: MockUser[];
@@ -36,23 +53,23 @@ class MockDataManager {
       return this.store;
     }
 
-    console.log('[MockData] Initializing enterprise mock data...');
+    console.log("[MockData] Initializing enterprise mock data...");
 
     // Generate teams first (50 teams)
     const teams = generateMockTeams(50);
-    const teamIds = teams.map(t => t.id);
+    const teamIds = teams.map((t) => t.id);
 
     // Generate users (200 users across teams)
     const users = generateMockUsers(200, teamIds);
-    const userIds = users.map(u => u.id);
+    const userIds = users.map((u) => u.id);
 
     // Assign users to teams
     assignUsersToTeams(teams, userIds);
 
     // Generate projects (100 projects across teams)
     const projects = generateMockProjects(100, teamIds);
-    const projectIds = projects.map(p => p.id);
-    const projectRepos = projects.map(p => p.repo);
+    const projectIds = projects.map((p) => p.id);
+    const projectRepos = projects.map((p) => p.repo);
 
     // Assign projects to teams
     assignProjectsToTeams(teams, projectIds);
@@ -68,8 +85,8 @@ class MockDataManager {
 
     // Generate arcade data
     const missions = generateMockMissions(50);
-    const userNames = users.map(u => u.name);
-    const teamNames = teams.map(t => t.name);
+    const userNames = users.map((u) => u.name);
+    const teamNames = teams.map((t) => t.name);
     const leaderboard = generateMockLeaderboard(userIds, userNames, teamNames);
     const badges = generateMockBadges();
 
@@ -78,7 +95,7 @@ class MockDataManager {
     const doraMetrics = generateMockDORAMetrics();
 
     // Generate notifications (50 per user, we'll generate for demo user)
-    const notifications = generateMockNotifications(50, 'user-1');
+    const notifications = generateMockNotifications(50, "user-1");
 
     this.store = {
       users,
@@ -93,17 +110,17 @@ class MockDataManager {
       roiInsights,
       doraMetrics,
       notifications,
-      initialized: true
+      initialized: true,
     };
 
-    console.log('[MockData] Initialized with:', {
+    console.log("[MockData] Initialized with:", {
       users: users.length,
       teams: teams.length,
       projects: projects.length,
       healingItems: healingItems.length,
       pipelines: pipelines.length,
       knowledge: knowledge.length,
-      missions: missions.length
+      missions: missions.length,
     });
 
     return this.store;
@@ -131,7 +148,7 @@ class MockDataManager {
    */
   updateUser(userId: string, updates: Partial<MockUser>): MockUser | null {
     const store = this.getStore();
-    const userIndex = store.users.findIndex(u => u.id === userId);
+    const userIndex = store.users.findIndex((u) => u.id === userId);
     if (userIndex === -1) return null;
 
     store.users[userIndex] = { ...store.users[userIndex], ...updates };
@@ -151,7 +168,9 @@ class MockDataManager {
    */
   markNotificationRead(notificationId: string): void {
     const store = this.getStore();
-    const notification = store.notifications.find(n => n.id === notificationId);
+    const notification = store.notifications.find(
+      (n) => n.id === notificationId
+    );
     if (notification) {
       notification.read = true;
     }
@@ -162,9 +181,9 @@ class MockDataManager {
    */
   approveHealingItem(healingId: string, reviewedBy: string): void {
     const store = this.getStore();
-    const item = store.healingItems.find(h => h.id === healingId);
+    const item = store.healingItems.find((h) => h.id === healingId);
     if (item) {
-      item.status = 'approved';
+      item.status = "approved";
       item.reviewedBy = reviewedBy;
       item.reviewedAt = new Date().toISOString();
     }
@@ -175,9 +194,9 @@ class MockDataManager {
    */
   rejectHealingItem(healingId: string, reviewedBy: string): void {
     const store = this.getStore();
-    const item = store.healingItems.find(h => h.id === healingId);
+    const item = store.healingItems.find((h) => h.id === healingId);
     if (item) {
-      item.status = 'rejected';
+      item.status = "rejected";
       item.reviewedBy = reviewedBy;
       item.reviewedAt = new Date().toISOString();
     }
@@ -188,7 +207,7 @@ class MockDataManager {
    */
   claimMission(missionId: string, userId: string): void {
     const store = this.getStore();
-    const mission = store.missions.find(m => m.id === missionId);
+    const mission = store.missions.find((m) => m.id === missionId);
     if (mission && !mission.claimed) {
       mission.claimed = true;
       mission.claimedBy = userId;
@@ -200,7 +219,7 @@ class MockDataManager {
    */
   completeMission(missionId: string, userId: string): void {
     const store = this.getStore();
-    const mission = store.missions.find(m => m.id === missionId);
+    const mission = store.missions.find((m) => m.id === missionId);
     if (mission) {
       mission.completedBy = mission.completedBy || [];
       mission.completedBy.push(userId);
@@ -214,32 +233,32 @@ export const mockDataManager = new MockDataManager();
 
 // Export types
 export type {
-  MockUser,
-  MockTeam,
-  MockProject,
-  MockHealingItem,
-  MockPipeline,
-  MockKnowledgeEntry,
-  MockMission,
-  MockLeaderboardEntry,
   MockBadge,
-  MockROIInsights,
   MockDORAMetrics,
-  MockNotification
+  MockHealingItem,
+  MockKnowledgeEntry,
+  MockLeaderboardEntry,
+  MockMission,
+  MockNotification,
+  MockPipeline,
+  MockProject,
+  MockROIInsights,
+  MockTeam,
+  MockUser,
 };
 
 // Export individual generators for testing
 export {
-  generateMockUsers,
-  generateMockTeams,
-  generateMockProjects,
-  generateMockHealingItems,
-  generateMockPipelines,
-  generateMockKnowledge,
-  generateMockMissions,
-  generateMockLeaderboard,
   generateMockBadges,
-  generateMockROIInsights,
   generateMockDORAMetrics,
-  generateMockNotifications
+  generateMockHealingItems,
+  generateMockKnowledge,
+  generateMockLeaderboard,
+  generateMockMissions,
+  generateMockNotifications,
+  generateMockPipelines,
+  generateMockProjects,
+  generateMockROIInsights,
+  generateMockTeams,
+  generateMockUsers,
 };

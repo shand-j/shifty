@@ -1,32 +1,31 @@
-"use client"
+"use client";
 
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
-import type { User, Tenant, Notification } from "./types"
-import { getAPIClient } from "./api-client"
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { Notification, Tenant, User } from "./types";
 
 interface AppState {
-  user: User | null
-  tenant: Tenant | null
-  token: string | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  sidebarCollapsed: boolean
-  commandPaletteOpen: boolean
-  notifications: Notification[]
-  loading: boolean
-  setUser: (user: User | null) => void
-  setTenant: (tenant: Tenant | null) => void
-  setToken: (token: string | null) => void
-  setAuthenticated: (isAuthenticated: boolean) => void
-  setLoading: (isLoading: boolean) => void
-  toggleSidebar: () => void
-  setSidebarCollapsed: (collapsed: boolean) => void
-  setCommandPaletteOpen: (open: boolean) => void
-  setNotifications: (notifications: Notification[]) => void
-  markNotificationRead: (id: string) => void
-  logout: () => void
-  loadNotifications: () => Promise<void>
+  user: User | null;
+  tenant: Tenant | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  sidebarCollapsed: boolean;
+  commandPaletteOpen: boolean;
+  notifications: Notification[];
+  loading: boolean;
+  setUser: (user: User | null) => void;
+  setTenant: (tenant: Tenant | null) => void;
+  setToken: (token: string | null) => void;
+  setAuthenticated: (isAuthenticated: boolean) => void;
+  setLoading: (isLoading: boolean) => void;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setCommandPaletteOpen: (open: boolean) => void;
+  setNotifications: (notifications: Notification[]) => void;
+  markNotificationRead: (id: string) => void;
+  logout: () => void;
+  loadNotifications: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -45,32 +44,35 @@ export const useAppStore = create<AppState>()(
       setToken: (token) => set({ token }),
       setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
       setLoading: (isLoading) => set({ isLoading }),
-      toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+      toggleSidebar: () =>
+        set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
       setNotifications: (notifications) => set({ notifications }),
       markNotificationRead: (id) =>
         set((state) => ({
-          notifications: state.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+          notifications: state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          ),
         })),
       logout: () => {
-        set({ user: null, tenant: null, token: null, isAuthenticated: false })
+        set({ user: null, tenant: null, token: null, isAuthenticated: false });
         // Clear API client token
-        if (typeof window !== 'undefined') {
-          import('./api-client').then(({ apiClient }) => {
-            apiClient.clearToken()
-          })
+        if (typeof window !== "undefined") {
+          import("./api-client").then(({ apiClient }) => {
+            apiClient.clearToken();
+          });
         }
       },
       loadNotifications: async () => {
         try {
-          const { apiClient } = await import('./api-client')
-          const notifications = await apiClient.getNotifications()
-          set({ notifications })
+          const { apiClient } = await import("./api-client");
+          const notifications = await apiClient.getNotifications();
+          set({ notifications });
         } catch (error) {
-          console.error('Failed to load notifications:', error)
+          console.error("Failed to load notifications:", error);
         }
-      }
+      },
     }),
     {
       name: "shifty-app-storage",
@@ -83,4 +85,4 @@ export const useAppStore = create<AppState>()(
       }),
     }
   )
-)
+);

@@ -32,16 +32,16 @@ test_endpoint() {
   local name=$1
   local url=$2
   local expected_field=$3
-  
+
   echo -n "Testing $name... "
-  
+
   response=$(curl -sf "$API_URL$url" || echo "FAILED")
-  
+
   if [ "$response" = "FAILED" ]; then
     echo "❌ FAILED (connection error)"
     return 1
   fi
-  
+
   # Check if response has success field
   if echo "$response" | jq -e '.success == true' > /dev/null 2>&1; then
     # Check if data field exists and has content

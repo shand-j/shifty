@@ -30,6 +30,7 @@ open http://localhost:3010/login
 ```
 
 **Login with:**
+
 - Email: `qa@shifty.ai`
 - Password: any (mock mode)
 
@@ -60,48 +61,56 @@ open http://localhost:3000/login
 After logging in, you'll have access to:
 
 ### Dashboard
+
 - **Total Tests:** 5,000 mock tests
 - **Pass Rate:** Realistic test execution stats
 - **Pending Healings:** 500+ selector healing suggestions
 - **Active Projects:** 100 projects across different frameworks
 
 ### Projects Page
+
 - Browse 100 mock projects
 - Different frameworks (Playwright, Cypress, Selenium, Jest)
 - Test counts and pass rates
 - Recent execution history
 
 ### Tests Page
+
 - 5,000 mock tests paginated
 - Filter by project, status, tags
 - View test details and history
 - See healing suggestions
 
 ### Healing Page
+
 - 500+ healing suggestions
 - Confidence scores (60-99%)
 - Different healing strategies
 - Approve/reject with one click
 
 ### Pipelines
+
 - 30 recent CI/CD runs
 - Success/failure status
 - Tests run and pass rates
 - Healings applied per run
 
 ### Insights/ROI
+
 - 12 months of ROI metrics
 - Time saved trends
 - Cost savings calculations
 - Tests automated over time
 
 ### Knowledge Base
+
 - 1,000+ entries
 - Categories: best practices, troubleshooting, etc.
 - Searchable and filterable
 - View counts and ratings
 
 ### Arcade
+
 - 50 missions across difficulty levels
 - Leaderboard with 200 users
 - Points and rankings
@@ -111,28 +120,31 @@ After logging in, you'll have access to:
 
 Each persona shows different views and metrics:
 
-| Email | Persona | Focus |
-|-------|---------|-------|
-| `dev@shifty.ai` | Developer | Tests, healings, PRs |
-| `qa@shifty.ai` | QA Engineer | All testing features |
-| `po@shifty.ai` | Product Owner | ROI, insights, metrics |
-| `manager@shifty.ai` | Manager | Dashboards, team metrics |
+| Email               | Persona       | Focus                    |
+| ------------------- | ------------- | ------------------------ |
+| `dev@shifty.ai`     | Developer     | Tests, healings, PRs     |
+| `qa@shifty.ai`      | QA Engineer   | All testing features     |
+| `po@shifty.ai`      | Product Owner | ROI, insights, metrics   |
+| `manager@shifty.ai` | Manager       | Dashboards, team metrics |
 
 ## Features to Test
 
 ### 1. Authentication
+
 - [x] Login with demo personas
 - [x] JWT token storage
 - [x] Auto-redirect to dashboard
 - [x] Logout clears session
 
 ### 2. API Integration
+
 - [x] All API calls go through API client
 - [x] Token auto-added to requests
 - [x] Mock mode intercepts requests
 - [x] Realistic response delays (50-300ms)
 
 ### 3. Mock Data Quality
+
 - [x] 200 users with realistic profiles
 - [x] 5,000 tests with varied status
 - [x] 500 healing suggestions with DOM snapshots
@@ -140,12 +152,14 @@ Each persona shows different views and metrics:
 - [x] Realistic metrics and trends
 
 ### 4. State Management
+
 - [x] User state persists across refresh
 - [x] Notifications load from API
 - [x] Tenant information displayed
 - [x] Logout clears all state
 
 ### 5. Real-Time Updates (Mock)
+
 - [x] WebSocket client connects
 - [x] Simulated test completion events
 - [x] Healing detection notifications
@@ -154,11 +168,13 @@ Each persona shows different views and metrics:
 ## Verify Mock Mode
 
 ### Check API Gateway Logs
+
 ```bash
 docker-compose logs api-gateway | grep Mock
 ```
 
 Should see:
+
 ```
 shifty-api-gateway    | 🎭 Mock mode enabled - intercepting API calls
 shifty-api-gateway    | [MockDataStore] Seeding enterprise mock data...
@@ -167,6 +183,7 @@ shifty-api-gateway    | [MockInterceptor] POST /api/v1/auth/login
 ```
 
 ### Check Frontend Network Tab
+
 1. Open DevTools → Network
 2. Login
 3. Navigate to Projects
@@ -176,6 +193,7 @@ shifty-api-gateway    | [MockInterceptor] POST /api/v1/auth/login
    - Response times: 50-300ms
 
 ### Check Mock Data Response
+
 ```bash
 curl -H "X-Mock-Mode: true" http://localhost:3000/api/v1/tenants
 
@@ -196,23 +214,26 @@ curl -H "X-Mock-Mode: true" http://localhost:3000/api/v1/tenants
 To use real backend services instead of mocks:
 
 1. **Update docker-compose.yml:**
+
 ```yaml
 api-gateway:
   environment:
-    - MOCK_MODE=false  # Change from true
+    - MOCK_MODE=false # Change from true
 
 frontend:
   environment:
-    - NEXT_PUBLIC_MOCK_MODE=false  # Change from true
+    - NEXT_PUBLIC_MOCK_MODE=false # Change from true
 ```
 
 2. **Ensure all services are running:**
+
 ```bash
 docker-compose ps
 # Should show all 20+ services as "Up"
 ```
 
 3. **Restart:**
+
 ```bash
 docker-compose restart api-gateway frontend
 ```
@@ -220,12 +241,14 @@ docker-compose restart api-gateway frontend
 ## Troubleshooting
 
 ### "Cannot find module '@shifty/shared'"
+
 ```bash
 cd packages/shared
 npm run build
 ```
 
 ### Port 3000 already in use
+
 ```bash
 # Kill process on port 3000
 lsof -ti:3000 | xargs kill -9
@@ -234,6 +257,7 @@ lsof -ti:3000 | xargs kill -9
 ```
 
 ### Frontend build fails
+
 ```bash
 cd apps/frontend
 rm -rf .next node_modules
@@ -242,11 +266,13 @@ npm run build
 ```
 
 ### Mock data not loading
+
 1. Check API Gateway logs for `[MockInterceptor]`
 2. Verify `MOCK_MODE=true` environment variable
 3. Rebuild shared package: `cd packages/shared && npm run build`
 
 ### CORS errors
+
 - Ensure API Gateway CORS includes `http://localhost:3010`
 - Check browser console for specific error
 - Verify API_URL env var in frontend

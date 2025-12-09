@@ -3,6 +3,7 @@
 ## ✅ Implementation Complete
 
 ### Core Integration Endpoints
+
 - [x] GitHub API endpoints (repos, PRs, commits)
 - [x] Jira API endpoints (issues, issue details)
 - [x] Slack API endpoints (channels, messages)
@@ -17,6 +18,7 @@
 - [x] Ollama AI API endpoints (generate)
 
 ### Infrastructure
+
 - [x] Mock adapters created (`services/integrations/src/mocks/adapters.ts`)
 - [x] Integration service updated with endpoints
 - [x] API Gateway routes configured for all integrations
@@ -26,28 +28,33 @@
 - [x] API Gateway depends on integrations service
 
 ### Frontend
+
 - [x] API client methods for all integrations
 - [x] TypeScript compilation successful
 - [x] Build successful (Next.js standalone)
 
 ### Backend
+
 - [x] Integrations service compiles successfully
 - [x] API Gateway compiles successfully
 - [x] Shared package built with mock exports
 
 ### Documentation
+
 - [x] Investor demo guide (`docs/demos/INVESTOR_DEMO_INTEGRATIONS.md`)
 - [x] Quick reference card (`docs/demos/QUICK_REFERENCE.md`)
 - [x] Implementation summary (`INTEGRATION_MOCKS_SUMMARY.md`)
 - [x] Updated integration implementation summary
 
 ### Testing Scripts
+
 - [x] Integration test script (`scripts/test-integrations.sh`)
 - [x] Script made executable
 
 ## 🚀 Pre-Demo Tasks (Day Before)
 
 ### Technical Setup
+
 - [ ] Run full build: `npm run build`
 - [ ] Start Docker stack: `docker-compose up -d`
 - [ ] Wait 30 seconds for services to start
@@ -59,6 +66,7 @@
 - [ ] Test browser console commands from quick reference
 
 ### Demo Preparation
+
 - [ ] Read full demo script (`docs/demos/INVESTOR_DEMO_INTEGRATIONS.md`)
 - [ ] Practice browser console commands
 - [ ] Memorize key statistics:
@@ -73,6 +81,7 @@
 - [ ] Record backup video (in case of technical issues)
 
 ### Materials to Prepare
+
 - [ ] Print quick reference card
 - [ ] Prepare laptop with:
   - Browser tabs pre-opened (dashboard, devtools)
@@ -84,6 +93,7 @@
   - Video recording of full demo
 
 ### Environment Check
+
 - [ ] Stable internet connection (if demoing remotely)
 - [ ] Laptop fully charged
 - [ ] External display working (if using projector)
@@ -94,6 +104,7 @@
 ## 🎯 Demo Day Checklist (30 min before)
 
 ### Startup Sequence
+
 - [ ] Open terminal
 - [ ] Navigate to project: `cd /path/to/shifty`
 - [ ] Start services: `docker-compose up -d`
@@ -107,6 +118,7 @@
 - [ ] Quick test: `await api.getGitHubRepos()`
 
 ### Browser Setup
+
 - [ ] Tab 1: Dashboard (main view)
 - [ ] Tab 2: Integrations page (if exists)
 - [ ] Tab 3: This checklist
@@ -115,6 +127,7 @@
 - [ ] Zoom level at 100% or comfortable for audience
 
 ### Backup Plan Ready
+
 - [ ] Video recording accessible
 - [ ] Screenshots folder open
 - [ ] Curl commands in a text file
@@ -123,6 +136,7 @@
 ## ⚠️ Known Limitations (Be Prepared to Address)
 
 ### What Works
+
 - ✅ All mock data returns immediately
 - ✅ Realistic response times (50-300ms)
 - ✅ All integrations return proper data structures
@@ -130,6 +144,7 @@
 - ✅ Data is consistent across calls (same session)
 
 ### What Doesn't Work (Yet)
+
 - ❌ Real OAuth flow (mocked)
 - ❌ Webhook verification (simulated)
 - ❌ Data persistence (in-memory only)
@@ -137,6 +152,7 @@
 - ❌ Rate limiting per provider
 
 ### If Asked
+
 **Q: "Is this real data?"**
 A: "This is mock data designed for demos. In production, we use OAuth2 with read-only access to pull real data from each platform."
 
@@ -149,6 +165,7 @@ A: "We have an adapter framework. New integrations take 2-3 weeks to add. Roadma
 ## 📊 Success Metrics
 
 After demo, you should be able to show:
+
 - [x] 12 third-party integrations working
 - [x] Real-time API calls in DevTools
 - [x] Realistic data in all responses
@@ -159,6 +176,7 @@ After demo, you should be able to show:
 ## 🎬 Post-Demo Follow-Up
 
 Materials to send investors:
+
 - [ ] Full demo script PDF
 - [ ] Technical architecture diagram
 - [ ] API documentation
@@ -169,12 +187,14 @@ Materials to send investors:
 ## 🆘 Emergency Contacts
 
 If technical issues during demo:
+
 1. Try backup video
 2. Fall back to curl commands
 3. Show screenshots
 4. Walk through architecture diagram
 
 Technical support (if available):
+
 - Engineering lead: [contact]
 - DevOps: [contact]
 

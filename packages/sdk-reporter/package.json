@@ -1,0 +1,39 @@
+{
+  "name": "@shifty/sdk-reporter",
+  "version": "1.0.0",
+  "description": "Playwright reporter for Shifty test orchestration with real-time streaming",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shifty/sdk-core": "*",
+    "ws": "^8.14.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.40.0",
+    "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0"
+  },
+  "keywords": [
+    "shifty",
+    "playwright",
+    "reporter",
+    "orchestration",
+    "testing"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shifty-ai/shifty.git",
+    "directory": "packages/sdk-reporter"
+  },
+  "license": "MIT"
+}

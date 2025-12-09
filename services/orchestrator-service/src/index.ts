@@ -444,12 +444,32 @@ async function start() {
   try {
     await dbManager.initialize();
     
-    // FIXME: CRITICAL - Verify database schema exists before starting
-    // This service requires tables from 015_test_orchestration.sql migration:
-    //   - test_runs, test_shards, test_results (used in orchestrate endpoint)
-    //   - healing_events (used in checkAndCreateHealingPR)
-    // Currently crashes with "relation 'test_runs' does not exist" if migration not run
-    // Add schema validation or migration runner here
+    // Verify database schema exists before starting
+    const requiredTables = [
+      'test_runs',
+      'test_shards', 
+      'test_results',
+      'test_history',
+      'healing_events',
+      'healing_prs',
+      'test_flakiness',
+      'test_artifacts'
+    ];
+    
+    console.log('[Orchestrator] Validating database schema...');
+    
+    for (const table of requiredTables) {
+      try {
+        await dbManager.query(`SELECT 1 FROM ${table} LIMIT 1`);
+      } catch (error) {
+        console.error(`[Orchestrator] ❌ Required table '${table}' does not exist`);
+        console.error('[Orchestrator] Run migration: database/migrations/015_test_orchestration.sql');
+        console.error('[Orchestrator] Or rebuild platform-db container with: docker-compose up -d --force-recreate platform-db');
+        process.exit(1);
+      }
+    }
+    
+    console.log('[Orchestrator] ✅ Database schema validated');
     
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`[Orchestrator] Server listening on port ${PORT}`);

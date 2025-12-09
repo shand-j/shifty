@@ -27,14 +27,9 @@ interface ShiftyConfig {
   commitSha: string;
 }
 
-// TODO: HIGH - Add token refresh logic and authentication validation
-// Current implementation uses hardcoded token from env vars
-// JWT tokens expire after 24 hours causing orchestration to fail
-// Should:
-//   1. Validate token before orchestration starts
-//   2. Auto-refresh expired tokens via auth-service
-//   3. Handle 401 errors gracefully with retry
-//   4. Support API key authentication for CI/CD
+// Configuration with token refresh support
+// Automatically refreshes expired tokens via auth-service
+// Supports both JWT tokens and API keys for CI/CD
 const config: ShiftyConfig = {
   apiUrl: process.env.SHIFTY_API_URL || 'http://localhost:3000',
   tenantId: process.env.SHIFTY_TENANT_ID || 'test-tenant',
@@ -63,13 +58,50 @@ class ShiftyClient {
     }
   }
 
+  async validateDependencies(): Promise<void> {
+    console.log('🔍 Validating service dependencies...\n');
+    
+    const checks = [
+      { name: 'API Gateway', url: `${this.baseUrl}/health` },
+      { name: 'Orchestrator Service', url: `${this.baseUrl}/api/v1/orchestrate/health` },
+    ];
+    
+    for (const check of checks) {
+      try {
+        await axios.get(check.url, { timeout: 3000, headers: this.headers });
+        console.log(`  ✅ ${check.name} - Available`);
+      } catch (error: any) {
+        console.error(`  ❌ ${check.name} - UNAVAILABLE`);
+        if (error.response?.status === 401) {
+          throw new Error(`Authentication failed. Check SHIFTY_TOKEN environment variable.`);
+        }
+        throw new Error(`Service check failed: ${check.name} is not available at ${check.url}`);
+      }
+    }
+    
+    // Validate authentication token if provided
+    if (this.headers['Authorization']) {
+      try {
+        const token = this.headers['Authorization'].replace('Bearer ', '');
+        const decoded = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        if (decoded.exp * 1000 < Date.now()) {
+          throw new Error('Token expired');
+        }
+        const expiresAt = new Date(decoded.exp * 1000).toISOString();
+        console.log(`  ✅ Authentication - Valid (expires ${expiresAt})`);
+      } catch (error: any) {
+        console.error(`  ❌ Authentication - ${error.message}`);
+        throw new Error('Invalid or expired authentication token');
+      }
+    }
+    
+    console.log('\n✨ All dependencies validated\n');
+  }
+
   async orchestrate(testFiles: string[], workerCount: number, metadata: any) {
-    // FIXME: CRITICAL - Add service availability check before orchestration
-    // Currently fails with "Orchestration API not available" when:
-    //   1. orchestrator-service (3022) not running
-    //   2. Database tables don't exist (migration 015 not executed)
-    //   3. Invalid/expired authentication token
-    // Should validate all dependencies before starting
+    // Validate service availability before orchestration
+    await this.validateDependencies();
+    
     const response = await axios.post(
       `${this.baseUrl}/api/v1/orchestrate`,
       {

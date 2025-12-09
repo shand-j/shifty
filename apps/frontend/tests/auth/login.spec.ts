@@ -1,14 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-// TODO: HIGH - Add pre-test validation to ensure dependencies are running
-// These tests require:
+// Pre-test validation now handled by global setup in playwright.config.ts
+// Tests require:
 //   1. Frontend dev server on port 3006 (npm run dev)
-//   2. Test user test@shifty.com exists in database
+//   2. Test user test@shifty.com exists in database (seed data added)
 //   3. API Gateway proxying to auth-service
-// Currently fail silently when dependencies missing
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3006';
-// FIXME: CRITICAL - Test user test@shifty.com does not exist in database
-// Must add seed data to init-platform-db.sql or create user in beforeAll hook
+
+// Test user created by init-platform-db.sql seed data
 const TEST_USER = {
   email: 'test@shifty.com',
   password: 'password123'

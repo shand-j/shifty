@@ -14,7 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - platform_db_data:/var/lib/postgresql/data
-      - ./infrastructure/docker/init-platform-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./infrastructure/docker/init-platform-db.sql:/docker-entrypoint-initdb.d/001-init.sql
+      - ./database/migrations/015_test_orchestration.sql:/docker-entrypoint-initdb.d/002-test-orchestration.sql
     networks:
       - shifty-network
     healthcheck:

@@ -681,6 +681,34 @@ services:
     networks:
       - shifty-network
 
+  # Test Workers (Playwright execution with auto-healing)
+  # Scale with: docker-compose up --scale test-worker=5
+  test-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - HEALING_ENGINE_URL=http://healing-engine:3005
+      - RESULTS_SERVICE_URL=http://results-service:3023
+      - SHIFTY_API_KEY=${SHIFTY_API_KEY:-dev-test-key}
+    depends_on:
+      redis:
+        condition: service_healthy
+      healing-engine:
+        condition: service_started
+      results-service:
+        condition: service_started
+    networks:
+      - shifty-network
+    deploy:
+      replicas: 3  # Default 3 workers, can be scaled up
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
 volumes:
   platform_db_data:
   redis_data:

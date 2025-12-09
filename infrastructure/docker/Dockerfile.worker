@@ -1,0 +1,44 @@
+# Worker Dockerfile
+# Based on official Playwright image with Shifty SDK pre-installed
+
+FROM mcr.microsoft.com/playwright:v1.50.0-jammy
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY turbo.json ./
+
+# Copy workspace packages
+COPY packages/ ./packages/
+COPY services/orchestrator-service/ ./services/orchestrator-service/
+
+# Install dependencies
+RUN npm ci --workspace=@shifty/sdk-reporter \
+    --workspace=@shifty/sdk-core \
+    --workspace=@shifty/sdk-playwright \
+    --workspace=@shifty/shared \
+    --workspace=@shifty/database
+
+# Build packages
+RUN npm run build --workspace=@shifty/shared
+RUN npm run build --workspace=@shifty/database
+RUN npm run build --workspace=@shifty/sdk-core
+RUN npm run build --workspace=@shifty/sdk-playwright
+RUN npm run build --workspace=@shifty/sdk-reporter
+
+# Copy worker script
+COPY infrastructure/docker/worker.ts ./infrastructure/docker/
+
+# Install Playwright browsers (already in base image but ensure latest)
+RUN npx playwright install chromium
+
+# Create directory for test files
+RUN mkdir -p /app/tests
+
+ENV NODE_ENV=production
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Run worker script
+CMD ["npx", "tsx", "infrastructure/docker/worker.ts"]

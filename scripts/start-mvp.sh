@@ -66,6 +66,13 @@ sleep 15
 echo -e "${GREEN}📥 Pulling AI models (this may take a few minutes on first run)...${NC}"
 docker-compose exec ollama ollama pull llama3.1 || echo "Model pull failed, continuing..."
 
+# TODO: CRITICAL - Add orchestration services (orchestrator, results, artifacts, flakiness-tracker)
+# Missing services required for Shifty test orchestration:
+#   - orchestrator-service (3022) - Test sharding and job distribution
+#   - results-service (3023) - Test results collection
+#   - artifact-storage (3024) - Screenshot/video/trace storage
+#   - flakiness-tracker (3025) - Flakiness analytics
+#   - minio (9000-9001) - Object storage for artifacts
 # Start backend services
 echo -e "${GREEN}🏗️ Starting backend services...${NC}"
 docker-compose up -d auth-service tenant-manager ai-orchestrator test-generator healing-engine

@@ -1,0 +1,57 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img [ref=e7]
+      - heading "Shifty" [level=1] [ref=e11]
+      - paragraph [ref=e12]: Quality Engineering Copilot
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: Welcome back
+        - generic [ref=e16]: Sign in to your account to continue
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - generic [ref=e20]: Email
+            - textbox "Email" [ref=e21]:
+              - /placeholder: Enter your email
+          - generic [ref=e22]:
+            - generic [ref=e23]: Password
+            - generic [ref=e24]:
+              - textbox "Password" [ref=e25]:
+                - /placeholder: Enter your password
+              - button [ref=e26]:
+                - img
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - checkbox "Remember me" [ref=e29]
+              - checkbox
+              - generic [ref=e30] [cursor=pointer]: Remember me
+            - button "Forgot password?" [ref=e31]
+          - button "Sign in" [ref=e32]
+        - generic [ref=e33]:
+          - generic [ref=e38]: Or continue with
+          - generic [ref=e39]:
+            - button "GitHub" [ref=e40]:
+              - img
+              - text: GitHub
+            - button "Google" [ref=e41]:
+              - img
+              - text: Google
+        - paragraph [ref=e42]:
+          - text: Don't have an account?
+          - button "Sign up" [ref=e43]
+        - generic [ref=e44]:
+          - paragraph [ref=e45]:
+            - text: "Demo credentials:"
+            - code [ref=e46]: dev@shifty.ai
+            - text: /
+            - code [ref=e47]: password123
+          - paragraph [ref=e48]: "Or try: qa@shifty.ai, po@shifty.ai, designer@shifty.ai, manager@shifty.ai"
+    - paragraph [ref=e49]: By signing in, you agree to our Terms of Service and Privacy Policy
+  - button "Open Next.js Dev Tools" [ref=e55] [cursor=pointer]:
+    - img [ref=e56]
+  - alert [ref=e59]
+```

@@ -1,6 +1,6 @@
 // Mock interceptor middleware for API Gateway
-// Provides enterprise-scale mock data when MOCK_MODE is enabled
-import { mockDataManager, MockDataStore } from "@shifty/shared/src/mocks";
+// Provides enterprise-scale mock data when MOCK_MODE is enabled  
+import { mockDataManager, MockDataStore } from "@shifty/shared";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 interface MockInterceptorOptions {

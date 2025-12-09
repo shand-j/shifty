@@ -294,6 +294,102 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": ["$tsc", "$eslint-stylish"]
+    },
+    {
+      "label": "📋 Count Critical TODOs",
+      "type": "shell",
+      "command": "echo '=== CRITICAL TASKS ===' && grep -r 'TODO: CRITICAL\\|FIXME: CRITICAL\\|MOCK: CRITICAL' --include='*.ts' --include='*.sh' --include='*.sql' --include='*.yml' services/ apps/ scripts/ infrastructure/ .github/ 2>/dev/null | wc -l && echo '' && echo 'Details:' && grep -r 'TODO: CRITICAL\\|FIXME: CRITICAL\\|MOCK: CRITICAL' --include='*.ts' --include='*.sh' --include='*.sql' -n services/ apps/ scripts/ infrastructure/ 2>/dev/null",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📋 List All TODOs",
+      "type": "shell",
+      "command": "echo '=== ALL TODO ITEMS ===' && grep -r 'TODO:\\|FIXME:\\|HACK:\\|MOCK:' --include='*.ts' --include='*.sh' --include='*.sql' --include='*.yml' --include='*.json' -n services/ apps/ scripts/ infrastructure/ .github/ 2>/dev/null | head -50",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📋 TODO Summary by Type",
+      "type": "shell",
+      "command": "echo '=== TODO SUMMARY ===' && echo '' && echo 'TODO items:' && grep -roh 'TODO:' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l && echo 'FIXME items:' && grep -roh 'FIXME:' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l && echo 'HACK items:' && grep -roh 'HACK:' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l && echo 'MOCK items:' && grep -roh 'MOCK:' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l && echo '' && echo 'CRITICAL priority:' && grep -roh 'CRITICAL' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l && echo 'HIGH priority:' && grep -roh 'HIGH' --include='*.ts' --include='*.sh' --include='*.sql' services/ apps/ scripts/ infrastructure/ 2>/dev/null | wc -l",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "✅ Show Completed TODOs (Git History)",
+      "type": "shell",
+      "command": "git log --all --grep='TODO\\|FIXME\\|HACK\\|MOCK' --oneline --graph --decorate | head -20",
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📋 Open Production Readiness Plan",
+      "type": "shell",
+      "command": "code PRODUCTION_READINESS_PLAN.md",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "📋 Open TODO Tree Summary",
+      "type": "shell",
+      "command": "code TODO_TREE_SUMMARY.md",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     }
   ]
 }

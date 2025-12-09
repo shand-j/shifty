@@ -95,19 +95,19 @@ export class ShiftyReporter implements Reporter {
   private startTime: number = 0;
   private workerId: string;
 
-  constructor(config: ShiftyReporterConfig = {}) {
+  constructor(config: Partial<ShiftyReporterConfig> = {}) {
     this.config = {
-      apiUrl: process.env.SHIFTY_API_URL || 'http://localhost:3000',
-      apiKey: process.env.SHIFTY_API_KEY || '',
-      tenantId: process.env.SHIFTY_TENANT_ID || '',
-      resultsServiceUrl: process.env.SHIFTY_RESULTS_WS_URL || 'ws://localhost:3023/ws',
-      runId: process.env.SHIFTY_RUN_ID,
-      shardIndex: process.env.SHIFTY_SHARD_INDEX ? parseInt(process.env.SHIFTY_SHARD_INDEX) : undefined,
-      totalShards: process.env.SHIFTY_TOTAL_SHARDS ? parseInt(process.env.SHIFTY_TOTAL_SHARDS) : undefined,
-      batchSize: 10,
-      uploadArtifacts: process.env.SHIFTY_UPLOAD_ARTIFACTS !== 'false',
-      artifactServiceUrl: process.env.SHIFTY_ARTIFACT_URL || 'http://localhost:3024',
       ...config,
+      apiUrl: config.apiUrl || process.env.SHIFTY_API_URL || 'http://localhost:3000',
+      apiKey: config.apiKey || process.env.SHIFTY_API_KEY || '',
+      tenantId: config.tenantId || process.env.SHIFTY_TENANT_ID || '',
+      resultsServiceUrl: config.resultsServiceUrl || process.env.SHIFTY_RESULTS_WS_URL || 'ws://localhost:3023/ws',
+      runId: config.runId || process.env.SHIFTY_RUN_ID,
+      shardIndex: config.shardIndex ?? (process.env.SHIFTY_SHARD_INDEX ? Number.parseInt(process.env.SHIFTY_SHARD_INDEX) : undefined),
+      totalShards: config.totalShards ?? (process.env.SHIFTY_TOTAL_SHARDS ? Number.parseInt(process.env.SHIFTY_TOTAL_SHARDS) : undefined),
+      batchSize: config.batchSize ?? 10,
+      uploadArtifacts: config.uploadArtifacts ?? (process.env.SHIFTY_UPLOAD_ARTIFACTS !== 'false'),
+      artifactServiceUrl: config.artifactServiceUrl || process.env.SHIFTY_ARTIFACT_URL || 'http://localhost:3024',
     };
 
     this.sdk = new ShiftySDK({ config: this.config });
@@ -294,12 +294,12 @@ export class ShiftyReporter implements Reporter {
         });
 
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as { url?: string };
           
           // Add URL to payload
-          if (artifactType === 'trace') payload.traceUrl = data.url;
-          else if (artifactType === 'screenshot') payload.screenshotUrl = data.url;
-          else if (artifactType === 'video') payload.videoUrl = data.url;
+          if (artifactType === 'trace' && data.url) payload.traceUrl = data.url;
+          else if (artifactType === 'screenshot' && data.url) payload.screenshotUrl = data.url;
+          else if (artifactType === 'video' && data.url) payload.videoUrl = data.url;
         }
       }
     } catch (error) {

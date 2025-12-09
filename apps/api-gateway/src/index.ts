@@ -12,7 +12,6 @@ import {
 } from "@shifty/shared";
 import Fastify from "fastify";
 import Redis from "ioredis";
-import { mockInterceptor } from "./middleware/mock-interceptor";
 
 // Validate configuration on startup
 try {
@@ -256,6 +255,13 @@ class APIGateway {
 
   private metricsCollector = new MetricsCollector();
 
+  // HACK: HIGH - Service URLs hardcoded to localhost as fallback
+  // In production/Docker these should use service discovery or env vars
+  // Currently breaks when services run in containers (need DNS names)
+  // Should use:
+  //   - Kubernetes: service-name.namespace.svc.cluster.local
+  //   - Docker Compose: service-name (container name)
+  //   - Consul/Eureka for service discovery
   // Service URLs configured via environment variables
   // Supports both localhost (dev) and Docker service names (compose)
   // For Kubernetes, use service-name.namespace.svc.cluster.local format
@@ -502,13 +508,16 @@ class APIGateway {
 
     // Default development origins - includes frontend apps
     const defaultOrigins = [
-      'http://localhost:3010', // Next.js frontend
+      'http://localhost:3006', // Next.js frontend (dev server when 3000 is taken)
+      'http://localhost:3010', // Next.js frontend (Docker)
       'http://localhost:3000', // API Gateway itself (for development)
       'http://frontend:3000' // Docker network
     ];
 
     await fastify.register(cors, {
-      origin: corsOrigins.length > 0 ? corsOrigins : defaultOrigins,
+      origin: process.env.NODE_ENV === 'production' 
+        ? (corsOrigins.length > 0 ? corsOrigins : false)
+        : true, // In development, allow all origins
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: [
@@ -591,13 +600,6 @@ class APIGateway {
     await fastify.register(jwt, {
       secret: jwtConfig.secret,
     });
-
-    // Register mock interceptor hook
-    const MOCK_MODE = process.env.MOCK_MODE === "true";
-    if (MOCK_MODE) {
-      console.log("🎭 Mock mode enabled - intercepting API calls");
-      fastify.addHook("preHandler", mockInterceptor);
-    }
   }
 
   private async registerRoutes() {
@@ -882,6 +884,7 @@ class APIGateway {
       await fastify.register(proxy, {
         upstream: service.target,
         prefix: service.prefix,
+        rewritePrefix: service.prefix, // Keep the full path when forwarding
         http2: false,
         replyOptions: {
           onError: (reply, error) => {

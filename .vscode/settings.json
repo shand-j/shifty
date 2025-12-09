@@ -22,6 +22,88 @@
   },
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  
+  // Todo Tree Extension Configuration
+  "todo-tree.general.tags": [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "MOCK",
+    "BUG",
+    "NOTE"
+  ],
+  "todo-tree.general.tagGroups": {
+    "CRITICAL": ["TODO: CRITICAL", "FIXME: CRITICAL", "MOCK: CRITICAL"],
+    "HIGH": ["TODO: HIGH", "FIXME: HIGH", "HACK: HIGH"],
+    "MEDIUM": ["TODO: MEDIUM", "FIXME: MEDIUM"]
+  },
+  "todo-tree.highlights.defaultHighlight": {
+    "icon": "alert",
+    "type": "text",
+    "foreground": "#ffffff",
+    "background": "#ffbd2e",
+    "opacity": 70,
+    "iconColour": "#ffbd2e"
+  },
+  "todo-tree.highlights.customHighlight": {
+    "TODO": {
+      "icon": "checklist",
+      "foreground": "#000000",
+      "background": "#ffbd2e",
+      "iconColour": "#ffbd2e"
+    },
+    "FIXME": {
+      "icon": "tools",
+      "foreground": "#ffffff",
+      "background": "#f06292",
+      "iconColour": "#f06292"
+    },
+    "HACK": {
+      "icon": "flame",
+      "foreground": "#000000",
+      "background": "#ffa726",
+      "iconColour": "#ffa726"
+    },
+    "MOCK": {
+      "icon": "beaker",
+      "foreground": "#ffffff",
+      "background": "#9c27b0",
+      "iconColour": "#9c27b0"
+    },
+    "BUG": {
+      "icon": "bug",
+      "foreground": "#ffffff",
+      "background": "#f44336",
+      "iconColour": "#f44336"
+    },
+    "NOTE": {
+      "icon": "note",
+      "foreground": "#000000",
+      "background": "#64b5f6",
+      "iconColour": "#64b5f6"
+    }
+  },
+  "todo-tree.regex.regex": "((//|#|<!--|;|/\\*|^)\\s*($TAGS)|^\\s*- \\[ \\])",
+  "todo-tree.general.statusBar": "total",
+  "todo-tree.general.showActivityBarBadge": true,
+  "todo-tree.filtering.includeGlobs": [
+    "**/*.ts",
+    "**/*.js",
+    "**/*.sh",
+    "**/*.sql",
+    "**/*.yml",
+    "**/*.yaml",
+    "**/*.json"
+  ],
+  "todo-tree.filtering.excludeGlobs": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.git/**"
+  ],
+  
+  // Existing todohighlight configuration (fallback)
   "todohighlight.keywords": [
     {
       "text": "TODO:",

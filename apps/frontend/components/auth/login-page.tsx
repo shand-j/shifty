@@ -37,26 +37,41 @@ export function LoginPage() {
       // Import API client dynamically to avoid SSR issues
       const { apiClient } = await import("@/lib/api-client");
 
+      console.log('Attempting login with:', email);
+
       // Call login API
       const response = await apiClient.login({
-        email: username,
+        email: email,
         password: password,
       });
+
+      console.log('Login response:', response);
 
       // Set user in store
       setUser({
         id: response.user.id,
-        name: `${response.user.firstName} ${response.user.lastName}`,
+        name: `${response.user.firstName || ''} ${response.user.lastName || ''}`.trim() || response.user.email,
         email: response.user.email,
         persona: response.user.persona as any,
         role: response.user.role as any,
       });
 
+      // Set tenant if available
+      if (response.tenant) {
+        setTenant(response.tenant);
+      }
+
       // Navigate to dashboard
       router.push("/dashboard");
     } catch (err: any) {
       console.error("Login error:", err);
-      setError(err.message || "Invalid credentials. Please try again.");
+      console.error("Error details:", {
+        message: err?.message,
+        response: err?.response,
+        status: err?.response?.status,
+        data: err?.response?.data
+      });
+      setError(err.response?.data?.message || err.message || "Invalid credentials. Please try again.");
       setLoading(false);
     }
   };

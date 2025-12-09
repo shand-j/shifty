@@ -208,5 +208,5 @@ export function getUsersByTeam(users: MockUser[], teamId: string): MockUser[] {
 
 // Helper to get user by email (for login)
 export function getUserByEmail(users: MockUser[], email: string): MockUser | undefined {
-  return users.filter(u => u.email === email);
+  return users.find(u => u.email === email);
 }

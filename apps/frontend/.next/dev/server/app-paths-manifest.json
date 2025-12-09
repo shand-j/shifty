@@ -1,9 +1,16 @@
 {
-  "/(app)/adoption/page": "app/(app)/adoption/page.js",
+  "/(app)/agent-prs/page": "app/(app)/agent-prs/page.js",
+  "/(app)/api-docs/page": "app/(app)/api-docs/page.js",
+  "/(app)/arcade/page": "app/(app)/arcade/page.js",
   "/(app)/dashboard/page": "app/(app)/dashboard/page.js",
+  "/(app)/healing/page": "app/(app)/healing/page.js",
   "/(app)/insights/page": "app/(app)/insights/page.js",
-  "/(app)/organization/page": "app/(app)/organization/page.js",
+  "/(app)/knowledge/page": "app/(app)/knowledge/page.js",
+  "/(app)/pipelines/page": "app/(app)/pipelines/page.js",
+  "/(app)/runs/page": "app/(app)/runs/page.js",
   "/(app)/sessions/page": "app/(app)/sessions/page.js",
+  "/(app)/settings/page": "app/(app)/settings/page.js",
+  "/(app)/tests/page": "app/(app)/tests/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js"
 }

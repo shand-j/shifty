@@ -5,7 +5,7 @@
  * Provides pre-signed URLs for uploads and retrieval with lifecycle management.
  */
 
-import Fastify from 'fastify';
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -82,7 +82,13 @@ await fastify.register(multipart, {
 // AUTHENTICATION DECORATOR
 // ============================================================
 
-fastify.decorate('authenticate', async function (request: any, reply: any) {
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify();
   } catch (err) {
@@ -181,12 +187,12 @@ fastify.post('/api/v1/artifacts/upload', {
     const sizeBytes = buffer.length;
 
     // Upload to MinIO
-    await minioClient.putObject(BUCKET_NAME, storageKey, buffer, sizeBytes, {
-      'Content-Type': data.mimetype,
+    const metadata: Record<string, string> = {
       'X-Tenant-ID': tenantId,
       'X-Run-ID': runId,
       'X-Artifact-Type': artifactType,
-    });
+    };
+    await minioClient.putObject(BUCKET_NAME, storageKey, buffer, sizeBytes, metadata);
 
     // Generate pre-signed URL for retrieval (24 hours)
     const url = await minioClient.presignedGetObject(BUCKET_NAME, storageKey, 24 * 60 * 60);
@@ -242,19 +248,18 @@ fastify.post('/api/v1/artifacts/presigned-upload', {
     const storageKey = generateStorageKey(tenantId, runId, artifactType, filename);
 
     // Generate pre-signed URL for upload (1 hour)
+    // Note: presignedPutObject doesn't accept headers, those are set during the PUT request
     const uploadUrl = await minioClient.presignedPutObject(
       BUCKET_NAME,
       storageKey,
-      60 * 60, // 1 hour
-      {
-        'Content-Type': contentType || 'application/octet-stream',
-      }
+      60 * 60 // 1 hour
     );
 
     reply.send({
       uploadUrl,
       storageKey,
       expiresIn: 3600,
+      contentType: contentType || 'application/octet-stream',
     });
   } catch (error: any) {
     console.error('[ArtifactStorage] Presigned upload error:', error);

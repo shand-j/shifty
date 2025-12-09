@@ -44,6 +44,10 @@
     "./mocks/factories": {
       "import": "./dist/mocks/factories.js",
       "require": "./dist/mocks/factories.js"
+    },
+    "./mocks": {
+      "import": "./dist/mocks/index.js",
+      "require": "./dist/mocks/index.js"
     }
   }
 }

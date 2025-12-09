@@ -1,0 +1,289 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]: Shifty - Quality Engineering Copilot
+  - generic [ref=e12]:
+    - banner [ref=e13]:
+      - generic [ref=e14]:
+        - link "Shifty" [ref=e15] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e16]:
+            - img [ref=e17]
+            - generic [ref=e21]: Shifty
+        - button "Enterprise" [ref=e22]:
+          - generic [ref=e23]: Enterprise
+          - img
+      - button "Search tests, sessions, incidents... ⌘ K" [ref=e24]:
+        - img
+        - generic [ref=e25]: Search tests, sessions, incidents...
+        - generic:
+          - generic: ⌘
+          - text: K
+      - generic [ref=e26]:
+        - button "Toggle theme" [ref=e27]:
+          - img
+          - img
+          - generic [ref=e28]: Toggle theme
+        - button [ref=e29]:
+          - img
+        - button "Test User" [ref=e30]:
+          - img "Test User" [ref=e32]
+    - generic [ref=e33]:
+      - complementary [ref=e34]:
+        - navigation [ref=e35]:
+          - link "Dashboard" [ref=e37] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e38]
+            - generic [ref=e43]: Dashboard
+          - link "Organization" [ref=e45] [cursor=pointer]:
+            - /url: /organization
+            - img [ref=e46]
+            - generic [ref=e50]: Organization
+          - link "Teams" [ref=e52] [cursor=pointer]:
+            - /url: /teams
+            - img [ref=e53]
+            - generic [ref=e58]: Teams
+          - link "Adoption" [ref=e60] [cursor=pointer]:
+            - /url: /adoption
+            - img [ref=e61]
+            - generic [ref=e65]: Adoption
+          - link "Tests" [ref=e67] [cursor=pointer]:
+            - /url: /tests
+            - img [ref=e68]
+            - generic [ref=e71]: Tests
+          - link "Test Runs" [ref=e73] [cursor=pointer]:
+            - /url: /runs
+            - img [ref=e74]
+            - generic [ref=e75]: Test Runs
+          - link "Healing" [ref=e77] [cursor=pointer]:
+            - /url: /healing
+            - img [ref=e78]
+            - generic [ref=e80]: Healing
+          - link "Sessions" [ref=e82] [cursor=pointer]:
+            - /url: /sessions
+            - img [ref=e83]
+            - generic [ref=e86]: Sessions
+          - link "Pipelines" [ref=e88] [cursor=pointer]:
+            - /url: /pipelines
+            - img [ref=e89]
+            - generic [ref=e93]: Pipelines
+          - link "Insights" [ref=e95] [cursor=pointer]:
+            - /url: /insights
+            - img [ref=e96]
+            - generic [ref=e98]: Insights
+          - link "Knowledge" [ref=e100] [cursor=pointer]:
+            - /url: /knowledge
+            - img [ref=e101]
+            - generic [ref=e111]: Knowledge
+          - link "Agent PRs" [ref=e113] [cursor=pointer]:
+            - /url: /agent-prs
+            - img [ref=e114]
+            - generic [ref=e118]: Agent PRs
+          - link "Arcade" [ref=e120] [cursor=pointer]:
+            - /url: /arcade
+            - img [ref=e121]
+            - generic [ref=e127]: Arcade
+          - link "API Docs" [ref=e129] [cursor=pointer]:
+            - /url: /api-docs
+            - img [ref=e130]
+            - generic [ref=e135]: API Docs
+          - link "Settings" [ref=e137] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e138]
+            - generic [ref=e141]: Settings
+        - button "Collapse" [ref=e143]:
+          - img
+          - generic [ref=e144]: Collapse
+      - main [ref=e145]:
+        - navigation [ref=e146]:
+          - link [ref=e147] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e148]
+          - generic [ref=e151]:
+            - img [ref=e152]
+            - generic [ref=e154]: Dashboard
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - heading "Dashboard" [level=1] [ref=e158]
+              - paragraph [ref=e159]: Welcome back, Test
+            - button "QA Engineer View" [ref=e160]:
+              - img
+              - generic [ref=e161]: QA Engineer View
+              - img
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - generic [ref=e164]:
+                - generic [ref=e165]:
+                  - generic [ref=e166]: Active Sessions
+                  - img [ref=e168]
+                - generic [ref=e172]: "3"
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]: Pending Heals
+                  - img [ref=e177]
+                - generic [ref=e179]:
+                  - generic [ref=e180]: "12"
+                  - generic [ref=e181]:
+                    - img [ref=e182]
+                    - generic [ref=e185]: 8%
+                    - generic [ref=e186]: vs last week
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - generic [ref=e189]: Flaky Tests
+                  - img [ref=e191]
+                - generic [ref=e193]:
+                  - generic [ref=e194]: "7"
+                  - generic [ref=e195]:
+                    - img [ref=e196]
+                    - generic [ref=e199]: 15%
+                    - generic [ref=e200]: vs last week
+              - generic [ref=e201]:
+                - generic [ref=e202]:
+                  - generic [ref=e203]: Avg Heal Time
+                  - img [ref=e205]
+                - generic [ref=e208]:
+                  - generic [ref=e209]: 2.4s
+                  - generic [ref=e210]:
+                    - img [ref=e211]
+                    - generic [ref=e214]: 12%
+                    - generic [ref=e215]: faster
+            - generic [ref=e216]:
+              - generic [ref=e217]:
+                - generic [ref=e218]:
+                  - generic [ref=e219]:
+                    - generic [ref=e220]: Recent Test Runs
+                    - link "View All" [ref=e221] [cursor=pointer]:
+                      - /url: /tests
+                      - button "View All" [ref=e222]:
+                        - text: View All
+                        - img
+                  - generic [ref=e224]:
+                    - generic [ref=e225]:
+                      - generic [ref=e226]:
+                        - generic [ref=e227]: passing
+                        - generic [ref=e228]:
+                          - paragraph [ref=e229]: login.spec.ts
+                          - paragraph [ref=e230]: Auth • 1.2s
+                      - generic [ref=e231]:
+                        - generic [ref=e232]: 5 min ago
+                        - button [ref=e233]:
+                          - img
+                    - generic [ref=e234]:
+                      - generic [ref=e235]:
+                        - generic [ref=e236]: failing
+                        - generic [ref=e237]:
+                          - paragraph [ref=e238]: checkout.spec.ts
+                          - paragraph [ref=e239]: Payments • 3.4s
+                      - generic [ref=e240]:
+                        - generic [ref=e241]: 12 min ago
+                        - button [ref=e242]:
+                          - img
+                    - generic [ref=e243]:
+                      - generic [ref=e244]:
+                        - generic [ref=e245]: flaky
+                        - generic [ref=e246]:
+                          - paragraph [ref=e247]: search.spec.ts
+                          - paragraph [ref=e248]: Core • 2.1s
+                      - generic [ref=e249]:
+                        - generic [ref=e250]: 1 hour ago
+                        - button [ref=e251]:
+                          - img
+                    - generic [ref=e252]:
+                      - generic [ref=e253]:
+                        - generic [ref=e254]: passing
+                        - generic [ref=e255]:
+                          - paragraph [ref=e256]: profile.spec.ts
+                          - paragraph [ref=e257]: User • 0.8s
+                      - generic [ref=e258]:
+                        - generic [ref=e259]: 2 hours ago
+                        - button [ref=e260]:
+                          - img
+                - generic [ref=e261]:
+                  - generic [ref=e262]:
+                    - generic [ref=e263]: Healing Queue
+                    - link "View All" [ref=e264] [cursor=pointer]:
+                      - /url: /healing
+                      - button "View All" [ref=e265]:
+                        - text: View All
+                        - img
+                  - generic [ref=e267]:
+                    - generic [ref=e268]:
+                      - generic [ref=e269]:
+                        - paragraph [ref=e270]: login.spec.ts
+                        - paragraph [ref=e271]: "#submit-btn → button[type=\"submit\"]"
+                      - generic [ref=e272]:
+                        - generic [ref=e273]: 94%
+                        - button [ref=e274]:
+                          - img
+                        - button [ref=e275]:
+                          - img
+                    - generic [ref=e276]:
+                      - generic [ref=e277]:
+                        - paragraph [ref=e278]: cart.spec.ts
+                        - paragraph [ref=e279]: .add-to-cart → [data-testid="add-cart"]
+                      - generic [ref=e280]:
+                        - generic [ref=e281]: 78%
+                        - button [ref=e282]:
+                          - img
+                        - button [ref=e283]:
+                          - img
+                    - generic [ref=e284]:
+                      - generic [ref=e285]:
+                        - paragraph [ref=e286]: search.spec.ts
+                        - paragraph [ref=e287]: "#search-input → input[name=\"q\"]"
+                      - generic [ref=e288]:
+                        - generic [ref=e289]: 62%
+                        - button [ref=e290]:
+                          - img
+                        - button [ref=e291]:
+                          - img
+              - generic [ref=e292]:
+                - generic [ref=e293]:
+                  - generic [ref=e295]: Quality Score
+                  - generic [ref=e296]:
+                    - generic [ref=e297]:
+                      - img [ref=e298]
+                      - generic [ref=e302]: 94%
+                    - paragraph [ref=e303]: Pass rate over last 7 days
+                - generic [ref=e304]:
+                  - generic [ref=e306]: Pass Rate Trend
+                  - application [ref=e311]
+                - generic [ref=e317]:
+                  - generic [ref=e319]: Recent Activity
+                  - generic [ref=e320]:
+                    - generic [ref=e321]:
+                      - img [ref=e323]
+                      - generic [ref=e324]:
+                        - paragraph [ref=e325]: "Alex Kim approved healing for #login-button selector"
+                        - generic [ref=e326]:
+                          - generic [ref=e327]: healing
+                          - generic [ref=e328]: 2 min ago
+                    - generic [ref=e329]:
+                      - img [ref=e331]
+                      - generic [ref=e332]:
+                        - paragraph [ref=e333]: Jordan Lee generated tests for checkout-flow.feature
+                        - generic [ref=e334]:
+                          - generic [ref=e335]: test
+                          - generic [ref=e336]: 15 min ago
+                    - generic [ref=e337]:
+                      - img [ref=e339]
+                      - generic [ref=e340]:
+                        - paragraph [ref=e341]: Casey Patel completed session Payment Integration
+                        - generic [ref=e342]:
+                          - generic [ref=e343]: session
+                          - generic [ref=e344]: 1 hour ago
+                    - generic [ref=e345]:
+                      - img [ref=e347]
+                      - generic [ref=e348]:
+                        - paragraph [ref=e349]: Morgan Davis triggered pipeline main branch
+                        - generic [ref=e350]:
+                          - generic [ref=e351]: pipeline
+                          - generic [ref=e352]: 2 hours ago
+    - generic [ref=e353]:
+      - heading "Command Palette" [level=2] [ref=e354]
+      - paragraph [ref=e355]: Search for a command to run...
+```

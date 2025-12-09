@@ -98,7 +98,7 @@ export class BrowserPool {
     }
   }
 
-  private async cleanup(): Promise<void> {
+  async cleanup(): Promise<void> {
     const now = Date.now();
     const ttlMs = this.ttlMinutes * 60 * 1000;
     const idsToRemove: string[] = [];
@@ -169,5 +169,13 @@ export class BrowserPool {
     }
 
     return stats;
+  }
+
+  entries(): IterableIterator<[string, PooledBrowser]> {
+    return this.pool.entries();
+  }
+
+  clear(): void {
+    this.pool.clear();
   }
 }

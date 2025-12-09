@@ -12,20 +12,7 @@ import {
   RequestLimits,
   HealSelectorRequestSchema,
   BatchHealRequestSchema,
-  getJwtConfig,
-  HealSelectorRequestSchema,
-  RequestLimits,
-  validateProductionConfig,
 } from "@shifty/shared";
-import Fastify from "fastify";
-import jwt from "jsonwebtoken";
-import { Browser, chromium, firefox, webkit } from "playwright";
-import { v4 as uuidv4 } from "uuid";
-import { z } from "zod";
-import {
-  HealingResult as CoreHealingResult,
-  SelectorHealer,
-} from "./core/selector-healer.js";
 
 // Validate configuration on startup
 try {
@@ -103,6 +90,7 @@ class HealingEngineService {
   private selectorHealer: SelectorHealer;
   private healingRepo: HealingAttemptsRepository;
   private browserPool: BrowserPool;
+  private cleanupInterval?: NodeJS.Timeout;
   // Configuration for tenant database URLs - in production, this would come from tenant manager
   private tenantDbUrlTemplate: string;
 
@@ -687,6 +675,11 @@ class HealingEngineService {
     return await this.browserPool.getBrowser(browserType);
   }
 
+  private cleanupIdleBrowsers() {
+    // Delegate to browser pool cleanup
+    this.browserPool.cleanup();
+  }
+
   private async closeAllBrowsers() {
     for (const [key, pooled] of this.browserPool.entries()) {
       try {
@@ -701,6 +694,13 @@ class HealingEngineService {
     }
   }
 
+  // MOCK: CRITICAL - Mock healing results should not be in production service code
+  // This method returns fake healing data for testing but is embedded in service logic
+  // Should be:
+  //   1. Moved to separate test utilities package
+  //   2. Only imported/used in test environment via dependency injection
+  //   3. Removed entirely from production builds
+  // Currently used when NODE_ENV=development and URL contains example.com
   private getMockHealingResult(
     brokenSelector: string,
     strategy?: string

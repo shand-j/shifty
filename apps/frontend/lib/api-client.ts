@@ -435,9 +435,7 @@ class APIClient {
     return response.data;
   }
 
-  async getFlakinessT
-
-rends(params?: {
+  async getFlakinessTrends(params?: {
     project?: string;
     days?: number;
   }): Promise<any> {

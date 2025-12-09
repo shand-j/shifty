@@ -206,7 +206,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - MOCK_MODE=true
+      - MOCK_MODE=false
       # Core services
       - TENANT_MANAGER_URL=http://tenant-manager:3001
       - AUTH_SERVICE_URL=http://auth-service:3002
@@ -605,6 +605,8 @@ services:
       timeout: 20s
       retries: 3
 
+  # TODO: CRITICAL - This service is defined but NOT started by scripts/start-mvp.sh
+  # Add to startup script to enable test orchestration
   # Orchestrator Service (Test orchestration with smart sharding)
   orchestrator-service:
     build:
@@ -630,7 +632,10 @@ services:
         condition: service_healthy
     networks:
       - shifty-network
+    # FIXME: Service crashes on startup with "relation 'test_runs' does not exist"
+    # Requires database migration 015_test_orchestration.sql to be executed first
 
+  # TODO: CRITICAL - Not started by scripts/start-mvp.sh
   # Results Service (Test results collection and streaming)
   results-service:
     build:
@@ -653,6 +658,8 @@ services:
     networks:
       - shifty-network
 
+  # TODO: CRITICAL - Not started by scripts/start-mvp.sh
+  # Requires MinIO to be running first
   # Artifact Storage Service (MinIO integration for traces/screenshots)
   artifact-storage:
     build:
@@ -682,6 +689,10 @@ services:
     networks:
       - shifty-network
 
+  # TODO: HIGH - Test workers not started by scripts/start-mvp.sh
+  # TODO: CRITICAL - Dockerfile.worker does not exist at infrastructure/docker/Dockerfile.worker
+  # This service is essential for executing tests from the BullMQ queue
+  # Without workers, orchestrated tests are enqueued but never executed
   # Test Workers (Playwright execution with auto-healing)
   # Scale with: docker-compose up --scale test-worker=5
   test-worker:
@@ -710,6 +721,7 @@ services:
           cpus: '2'
           memory: 2G
 
+  # TODO: CRITICAL - Not started by scripts/start-mvp.sh
   # Flakiness Tracker Service
   flakiness-tracker:
     build:

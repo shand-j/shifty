@@ -5,7 +5,7 @@
  * Creates jobs for worker pool and tracks execution progress.
  */
 
-import Fastify from 'fastify';
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -53,6 +53,16 @@ const testQueue = new Queue('test-execution', {
   connection: redis,
 });
 
+// TODO: HIGH - Implement BullMQ worker to process test execution jobs
+// Currently jobs are enqueued but no worker is consuming them
+// Worker should:
+//   1. Dequeue jobs from 'test-execution' queue
+//   2. Execute Playwright tests for assigned shard
+//   3. Report results to results-service (port 3023)
+//   4. Update test_results table with pass/fail status
+//   5. Trigger healing on failures
+// See: services/test-worker/ (needs to be created)
+
 // ============================================================
 // REGISTER PLUGINS
 // ============================================================
@@ -74,7 +84,13 @@ await fastify.register(jwt, {
 // AUTHENTICATION DECORATOR
 // ============================================================
 
-fastify.decorate('authenticate', async function (request: any, reply: any) {
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify();
   } catch (err) {
@@ -121,7 +137,7 @@ async function createShards(
   });
 
   // Assign durations to test files
-  const testsWithDurations = testFiles.map(test => ({
+  const testsWithDurations = testFiles.map((test: TestFile) => ({
     file: test.file,
     duration: test.estimatedDuration || durationMap.get(test.file) || 10000,
   }));
@@ -170,9 +186,6 @@ const OrchestrateSchema = z.object({
 // Start orchestrated test run
 fastify.post('/api/v1/orchestrate', {
   onRequest: [fastify.authenticate],
-  schema: {
-    body: OrchestrateSchema,
-  },
 }, async (request, reply) => {
   try {
     const { testFiles, workerCount, project, branch, commitSha, metadata } = request.body as any;
@@ -188,7 +201,7 @@ fastify.post('/api/v1/orchestrate', {
 
     // Create shards using greedy bin-packing
     const shards = await createShards(
-      testFiles.map(file => ({ file })),
+      testFiles.map((file: string) => ({ file })),
       workerCount,
       tenantId
     );
@@ -397,8 +410,8 @@ async function checkAndCreateHealingPR(runId: string, tenantId: string): Promise
     });
 
     if (response.ok) {
-      const prData = await response.json();
-      console.log(`[Orchestrator] Created healing PR: ${prData.prUrl}`);
+      const prData = await response.json() as { prUrl?: string };
+      console.log(`[Orchestrator] Created healing PR: ${prData.prUrl || 'unknown'}`);
     } else {
       console.error(`[Orchestrator] Failed to create healing PR: ${response.statusText}`);
     }
@@ -430,6 +443,14 @@ const PORT = parseInt(process.env.PORT || '3022');
 async function start() {
   try {
     await dbManager.initialize();
+    
+    // FIXME: CRITICAL - Verify database schema exists before starting
+    // This service requires tables from 015_test_orchestration.sql migration:
+    //   - test_runs, test_shards, test_results (used in orchestrate endpoint)
+    //   - healing_events (used in checkAndCreateHealingPR)
+    // Currently crashes with "relation 'test_runs' does not exist" if migration not run
+    // Add schema validation or migration runner here
+    
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`[Orchestrator] Server listening on port ${PORT}`);
     console.log(`[Orchestrator] Queue ready for test execution jobs`);

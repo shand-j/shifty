@@ -5,7 +5,7 @@
  * Provides WebSocket endpoint for streaming and REST API for querying results.
  */
 
-import Fastify from 'fastify';
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -67,7 +67,13 @@ await fastify.register(websocket);
 // AUTHENTICATION DECORATOR
 // ============================================================
 
-fastify.decorate('authenticate', async function (request: any, reply: any) {
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
+
+fastify.decorate('authenticate', async function (request: FastifyRequest, reply: FastifyReply) {
   try {
     await request.jwtVerify();
   } catch (err) {
@@ -322,16 +328,6 @@ function broadcastToRun(runId: string, message: any): void {
 // Get test runs with filtering
 fastify.get('/api/v1/runs', {
   onRequest: [fastify.authenticate],
-  schema: {
-    querystring: z.object({
-      tenant: z.string().optional(),
-      project: z.string().optional(),
-      branch: z.string().optional(),
-      status: z.enum(['all', 'pending', 'running', 'completed', 'failed', 'cancelled']).optional(),
-      limit: z.string().transform(Number).optional(),
-      offset: z.string().transform(Number).optional(),
-    }),
-  },
 }, async (request, reply) => {
   const { tenant, project, branch, status, limit = '50', offset = '0' } = request.query as any;
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useRunsStore } from "@/lib/runs-store";
+import { LiveRunViewer } from "@/components/runs/live-run-viewer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +15,7 @@ import {
   Clock, 
   Loader2,
   Download,
-  PlayCircle,
   AlertCircle,
-  FileText,
-  Image,
-  Video
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -27,13 +24,28 @@ export default function RunDetailsPage() {
   const router = useRouter();
   const runId = params.id as string;
   const { currentRun, isLoading, loadRunDetails } = useRunsStore();
-  const [selectedTest, setSelectedTest] = useState<string | null>(null);
+  
+  // Get auth token from localStorage (client-side only)
+  const [apiKey, setApiKey] = useState<string>("");
+  const [tenantId, setTenantId] = useState<string>("");
 
   useEffect(() => {
     if (runId) {
       loadRunDetails(runId);
     }
   }, [runId, loadRunDetails]);
+
+  useEffect(() => {
+    if (typeof globalThis.window !== "undefined") {
+      setApiKey(localStorage.getItem("shifty_token") || "");
+      // Get tenant ID from user data in localStorage
+      const userData = localStorage.getItem("shifty_user");
+      if (userData) {
+        const user = JSON.parse(userData);
+        setTenantId(user.tenantId || "");
+      }
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -100,7 +112,6 @@ export default function RunDetailsPage() {
 
   const passedTests = currentRun.results.filter(r => r.status === "passed");
   const failedTests = currentRun.results.filter(r => r.status === "failed");
-  const skippedTests = currentRun.results.filter(r => r.status === "skipped");
   const flakyTests = currentRun.results.filter(r => r.status === "flaky");
   const healedTests = currentRun.results.filter(r => r.healingSucceeded);
 
@@ -141,7 +152,18 @@ export default function RunDetailsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Live Viewer for Running Tests */}
+      {currentRun.status === "running" && apiKey && tenantId && (
+        <LiveRunViewer
+          runId={runId}
+          tenantId={tenantId}
+          apiKey={apiKey}
+          wsUrl={process.env.NEXT_PUBLIC_RESULTS_WS_URL || "ws://localhost:3023/ws"}
+        />
+      )}
+
+      {/* Stats Cards - Only show for completed runs */}
+      {currentRun.status !== "running" && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
@@ -219,7 +241,10 @@ export default function RunDetailsPage() {
         </Card>
       </div>
 
-      {/* Test Results Tabs */}
+      )}
+
+      {/* Test Results Tabs - Only show for completed runs */}
+      {currentRun.status !== "running" && (
       <Card>
         <Tabs defaultValue="all" className="w-full">
           <CardHeader>
@@ -265,6 +290,7 @@ export default function RunDetailsPage() {
           </CardContent>
         </Tabs>
       </Card>
+      )}
     </div>
   );
 }

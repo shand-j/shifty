@@ -91,6 +91,21 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- TODO: CRITICAL - Add seed user for development/testing
+-- Frontend tests expect test@shifty.com to exist
+-- Password: password123 (bcrypt hashed: $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7n5cWz.jSq)
+-- Example:
+-- INSERT INTO users (id, tenant_id, email, password, first_name, last_name, role)
+-- VALUES (
+--   '06313bcd-0995-4e3a-8f15-df7eb47fe7ef',
+--   (SELECT id FROM tenants LIMIT 1),
+--   'test@shifty.com',
+--   '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7n5cWz.jSq',
+--   'Test',
+--   'User',
+--   'owner'
+-- ) ON CONFLICT DO NOTHING;
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -98,6 +113,14 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_tenant_id ON api_keys(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_test_generation_requests_tenant_id ON test_generation_requests(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_test_generation_requests_status ON test_generation_requests(status);
 CREATE INDEX IF NOT EXISTS idx_healing_attempts_tenant_id ON healing_attempts(tenant_id);
+
+-- TODO: CRITICAL - Execute 015_test_orchestration.sql migration
+-- This migration creates tables required for test orchestration:
+--   - test_runs, test_shards, test_results, test_history
+--   - healing_events, healing_prs, test_flakiness, test_artifacts
+-- Currently these tables do NOT exist causing orchestrator-service to crash
+-- Solution: Add migration to docker entrypoint or run manually:
+-- docker exec -it shifty-platform-db psql -U postgres -d shifty_platform -f /path/to/015_test_orchestration.sql
 CREATE INDEX IF NOT EXISTS idx_healing_attempts_success ON healing_attempts(success);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant_id ON audit_logs(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);

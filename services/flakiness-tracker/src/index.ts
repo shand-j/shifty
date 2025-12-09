@@ -6,7 +6,7 @@
  * Provides API for querying flaky tests.
  */
 
-import Fastify from 'fastify';
+import Fastify, { FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -18,6 +18,16 @@ import {
 } from '@shifty/shared';
 import cron from 'node-cron';
 import { z } from 'zod';
+
+// Declare custom decorator for TypeScript
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (
+      request: FastifyRequest,
+      reply: FastifyReply
+    ) => Promise<void>;
+  }
+}
 
 // Validate configuration on startup
 try {

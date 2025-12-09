@@ -1,0 +1,86 @@
+name: 'Shifty Rerun Failed Tests'
+description: 'Rerun only failed tests from previous Shifty orchestration run'
+author: 'Shifty'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  shifty-api-url:
+    description: 'Shifty API URL'
+    required: false
+    default: 'https://api.shifty.ai'
+  
+  shifty-api-key:
+    description: 'Shifty API key'
+    required: true
+  
+  run-id:
+    description: 'Previous run ID to get failed tests from'
+    required: true
+  
+  output-file:
+    description: 'Output file path for failed test list'
+    required: false
+    default: 'failed-tests.txt'
+
+outputs:
+  failed-tests-count:
+    description: 'Number of failed tests from previous run'
+    value: ${{ steps.fetch.outputs.count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Fetch failed tests from Shifty
+      id: fetch
+      shell: bash
+      env:
+        SHIFTY_API_URL: ${{ inputs.shifty-api-url }}
+        SHIFTY_API_KEY: ${{ inputs.shifty-api-key }}
+        RUN_ID: ${{ inputs.run-id }}
+        OUTPUT_FILE: ${{ inputs.output-file }}
+      run: |
+        # Fetch failed tests from Shifty API
+        response=$(curl -s -X GET "${SHIFTY_API_URL}/api/v1/runs/${RUN_ID}/failed-tests" \
+          -H "Authorization: Bearer ${SHIFTY_API_KEY}" \
+          -H "Content-Type: application/json")
+        
+        # Extract test files and names
+        echo "$response" | jq -r '.failedTests[] | "\(.test_file):\(.test_name)"' > "${OUTPUT_FILE}"
+        
+        # Count failed tests
+        count=$(wc -l < "${OUTPUT_FILE}")
+        echo "count=${count}" >> $GITHUB_OUTPUT
+        
+        echo "Found ${count} failed tests from run ${RUN_ID}"
+        
+        # Display failed tests
+        if [ ${count} -gt 0 ]; then
+          echo "Failed tests:"
+          cat "${OUTPUT_FILE}"
+        else
+          echo "No failed tests found"
+        fi
+
+    - name: Format for Playwright
+      shell: bash
+      env:
+        OUTPUT_FILE: ${{ inputs.output-file }}
+      run: |
+        # Convert to Playwright grep pattern format
+        # From: "tests/login.spec.ts:should login successfully"
+        # To: grep pattern compatible format
+        
+        if [ -f "${OUTPUT_FILE}" ] && [ -s "${OUTPUT_FILE}" ]; then
+          # Create grep pattern file
+          grep_file="${OUTPUT_FILE%.txt}-grep.txt"
+          
+          # Extract just test file paths for now
+          # Playwright will run all tests in these files
+          cut -d':' -f1 "${OUTPUT_FILE}" | sort -u > "${grep_file}"
+          
+          echo "Created grep file: ${grep_file}"
+          cat "${grep_file}"
+        fi

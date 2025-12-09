@@ -213,6 +213,11 @@ services:
       - AI_ORCHESTRATOR_URL=http://ai-orchestrator:3003
       - TEST_GENERATOR_URL=http://test-generator:3004
       - HEALING_ENGINE_URL=http://healing-engine:3005
+      # Test orchestration
+      - ORCHESTRATOR_SERVICE_URL=http://orchestrator-service:3022
+      - RESULTS_SERVICE_URL=http://results-service:3023
+      - ARTIFACT_STORAGE_URL=http://artifact-storage:3024
+      - FLAKINESS_TRACKER_URL=http://flakiness-tracker:3025
       # Testing modalities
       - ROI_SERVICE_URL=http://roi-service:3015
       - PERFORMANCE_TESTING_URL=http://performance-testing:3016
@@ -254,6 +259,12 @@ services:
       cicd-governor:
         condition: service_started
       integrations:
+        condition: service_started
+      orchestrator-service:
+        condition: service_started
+      results-service:
+        condition: service_started
+      artifact-storage:
         condition: service_started
     networks:
       - shifty-network
@@ -573,10 +584,159 @@ services:
     networks:
       - shifty-network
 
+  # MinIO Object Storage (for test artifacts)
+  minio:
+    image: minio/minio:latest
+    container_name: shifty-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - shifty-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Orchestrator Service (Test orchestration with smart sharding)
+  orchestrator-service:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/orchestrator-service
+        PACKAGE_NAME: "@shifty/orchestrator-service"
+    container_name: shifty-orchestrator
+    ports:
+      - "3022:3022"
+    environment:
+      - NODE_ENV=development
+      - PORT=3022
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+      - PRODUCTION_FEEDBACK_URL=http://production-feedback:3013
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Results Service (Test results collection and streaming)
+  results-service:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/results-service
+        PACKAGE_NAME: "@shifty/results-service"
+    container_name: shifty-results
+    ports:
+      - "3023:3023"
+    environment:
+      - NODE_ENV=development
+      - PORT=3023
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Artifact Storage Service (MinIO integration for traces/screenshots)
+  artifact-storage:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/artifact-storage
+        PACKAGE_NAME: "@shifty/artifact-storage"
+    container_name: shifty-artifacts
+    ports:
+      - "3024:3024"
+    environment:
+      - NODE_ENV=development
+      - PORT=3024
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=shifty-artifacts
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
+  # Test Workers (Playwright execution with auto-healing)
+  # Scale with: docker-compose up --scale test-worker=5
+  test-worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.worker
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - HEALING_ENGINE_URL=http://healing-engine:3005
+      - RESULTS_SERVICE_URL=http://results-service:3023
+      - SHIFTY_API_KEY=${SHIFTY_API_KEY:-dev-test-key}
+    depends_on:
+      redis:
+        condition: service_healthy
+      healing-engine:
+        condition: service_started
+      results-service:
+        condition: service_started
+    networks:
+      - shifty-network
+    deploy:
+      replicas: 3  # Default 3 workers, can be scaled up
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # Flakiness Tracker Service
+  flakiness-tracker:
+    build:
+      context: .
+      dockerfile: services/Dockerfile.service
+      args:
+        SERVICE_PATH: services/flakiness-tracker
+        PACKAGE_NAME: "@shifty/flakiness-tracker"
+    container_name: shifty-flakiness-tracker
+    ports:
+      - "3025:3025"
+    environment:
+      - NODE_ENV=development
+      - PORT=3025
+      - DATABASE_URL=postgresql://postgres:postgres@platform-db:5432/shifty_platform
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-change-in-production}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    networks:
+      - shifty-network
+
 volumes:
   platform_db_data:
   redis_data:
   ollama_models:
+  minio_data:
 
 networks:
   shifty-network:

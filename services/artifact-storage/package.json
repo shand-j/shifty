@@ -1,0 +1,30 @@
+{
+  "name": "@shifty/artifact-storage",
+  "version": "1.0.0",
+  "description": "Artifact storage service with MinIO for test traces, screenshots, and videos",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.4.0",
+    "@fastify/helmet": "^11.1.0",
+    "@fastify/jwt": "^7.2.0",
+    "@fastify/multipart": "^8.0.0",
+    "@shifty/database": "*",
+    "@shifty/shared": "*",
+    "fastify": "^4.24.0",
+    "minio": "^7.1.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.2.0"
+  }
+}

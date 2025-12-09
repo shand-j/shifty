@@ -19,6 +19,7 @@ import {
   Users,
   Building2,
   Target,
+  List,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/teams", label: "Teams", icon: Users },
   { href: "/adoption", label: "Adoption", icon: Target },
   { href: "/tests", label: "Tests", icon: TestTube2 },
+  { href: "/runs", label: "Test Runs", icon: List },
   { href: "/healing", label: "Healing", icon: Sparkles },
   { href: "/sessions", label: "Sessions", icon: PlayCircle },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },

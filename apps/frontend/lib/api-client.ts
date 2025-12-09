@@ -374,6 +374,82 @@ class APIClient {
     return response.data.data || response.data;
   }
 
+  // Test Orchestration
+  async startOrchestration(data: {
+    testFiles: string[];
+    workerCount?: number;
+    project?: string;
+    branch?: string;
+    commitSha?: string;
+    metadata?: Record<string, any>;
+  }): Promise<any> {
+    const response = await this.client.post("/api/v1/orchestrate", data);
+    return response.data;
+  }
+
+  async getTestRuns(params?: {
+    tenant?: string;
+    project?: string;
+    branch?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
+    const response = await this.client.get("/api/v1/runs", { params });
+    return response.data;
+  }
+
+  async getTestRun(runId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/runs/${runId}`);
+    return response.data;
+  }
+
+  async getFailedTests(runId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/runs/${runId}/failed-tests`);
+    return response.data;
+  }
+
+  async getRunArtifacts(runId: string): Promise<any> {
+    const response = await this.client.get(`/api/v1/runs/${runId}/artifacts`);
+    return response.data;
+  }
+
+  async cancelOrchestration(runId: string): Promise<any> {
+    const response = await this.client.delete(`/api/v1/orchestrate/${runId}`);
+    return response.data;
+  }
+
+  async getQueueStats(): Promise<any> {
+    const response = await this.client.get("/api/v1/orchestrate/queue/stats");
+    return response.data;
+  }
+
+  // Flakiness Analytics
+  async getFlakyTests(params?: {
+    project?: string;
+    minRate?: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
+    const response = await this.client.get("/api/v1/analytics/flaky-tests", { params });
+    return response.data;
+  }
+
+  async getFlakinessT
+
+rends(params?: {
+    project?: string;
+    days?: number;
+  }): Promise<any> {
+    const response = await this.client.get("/api/v1/analytics/flakiness-trends", { params });
+    return response.data;
+  }
+
+  async getFlakyRecommendations(): Promise<any> {
+    const response = await this.client.get("/api/v1/analytics/flaky-recommendations");
+    return response.data;
+  }
+
   // Health check
   async healthCheck(): Promise<{ status: string }> {
     const response = await this.client.get("/health");

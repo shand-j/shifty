@@ -386,47 +386,131 @@ npm run test:integration
 
 ---
 
-## Continuous Integration
+## Continuous Integration ✅
 
-### GitHub Actions Workflow
-```yaml
-# .github/workflows/gtm-readiness-tests.yml (to be created)
-name: GTM Readiness Tests
+### GitHub Actions Workflows (ACTIVE)
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+All tests automatically run on every PR via GitHub Actions:
 
-jobs:
-  api-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: ./scripts/start-mvp.sh
-      - run: npm run test:api
-      
-  frontend-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: ./scripts/start-mvp.sh
-      - run: cd apps/frontend && npm test
-      
-  integration-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: ./scripts/start-mvp.sh
-      - run: npm run test:integration
+#### 1. **GTM Readiness - All Tests** (Main PR Check)
+**File:** `.github/workflows/gtm-readiness-all-tests.yml`
+
+Comprehensive workflow that runs all 125+ tests:
+- Pre-flight checks (lint, type-check, critical TODO scan)
+- API tests (65+ tests with coverage validation)
+- Frontend tests (45+ Playwright tests)
+- Integration tests (15+ E2E tests)
+- Final status report with PR comment
+
+**Triggers:** All PRs to main/develop, manual dispatch  
+**Duration:** ~30-45 minutes  
+**Status:** ✅ Active and enforced
+
+#### 2. **CI - API Tests**
+**File:** `.github/workflows/ci-api-tests.yml`
+
+Backend API tests with:
+- All service endpoints tested
+- Coverage reporting (70%+ threshold)
+- Security scanning (npm audit)
+- Lint and type checking
+
+**Services:** Auth, Tenant, AI, Test Gen, Healing, Orchestrator, ROI
+
+#### 3. **Frontend Tests**
+**File:** `.github/workflows/frontend-tests.yml`
+
+Playwright tests across browsers:
+- Chromium, Firefox, WebKit
+- All persona workflows (PO, QA, Dev)
+- Visual test reports
+- Screenshot/video artifacts
+
+#### 4. **Integration Tests**
+**File:** `.github/workflows/integration-tests.yml`
+
+End-to-end workflows:
+- All 14 services running
+- Complete user journeys
+- Cross-service communication
+- Database migrations
+
+### Viewing CI Results
+
+**In PR:**
+- Status checks at bottom of PR
+- Automated comment with results summary
+- Links to detailed reports
+
+**In Actions Tab:**
+- Navigate to: Repository → Actions
+- View logs, download artifacts
+- See test history and trends
+
+### Local Pre-CI Validation
+
+Run same tests locally before pushing:
+
+```bash
+# Complete validation (same as CI)
+npm run lint
+npm run type-check
+npm test                      # API tests
+cd apps/frontend && npm test  # Frontend tests
+npm run test:integration      # E2E tests
+
+# Quick check
+./scripts/health-check.sh
+grep -r "TODO: CRITICAL" services/ apps/ packages/
 ```
+
+### CI/CD Pipeline Status
+
+```
+┌─────────────────────────────────────┐
+│  PR Created/Updated                 │
+└──────────────┬──────────────────────┘
+               ↓
+┌─────────────────────────────────────┐
+│  GTM Readiness Workflow Triggered   │
+│  Status: ✅ Active                  │
+└──────────────┬──────────────────────┘
+               ↓
+       ┌───────┴───────┐
+       ↓               ↓
+┌──────────────┐  ┌──────────────┐
+│ Pre-flight   │  │ Parallel     │
+│ Checks       │  │ Test Exec    │
+│ ✅ Running   │  │ ✅ Running   │
+└──────────────┘  └──────────────┘
+       ↓               ↓
+┌─────────────────────────────────────┐
+│  Status Report & PR Comment         │
+│  ✅ All tests passing               │
+└─────────────────────────────────────┘
+```
+
+### Required PR Checks
+
+Every PR must pass:
+1. ✅ Pre-flight checks (lint, type-check)
+2. ✅ API tests (65+ tests, 70%+ coverage)
+3. ✅ Frontend tests (45+ tests, all browsers)
+4. ✅ Integration tests (15+ E2E workflows)
+5. ✅ Zero critical TODOs
+6. ✅ Security scan (no high/critical vulnerabilities)
+
+### Artifacts & Reports
+
+CI workflows upload:
+- Test results (JSON/HTML)
+- Coverage reports (LCOV, HTML)
+- Playwright reports (screenshots, videos, traces)
+- Test execution logs
+
+**Retention:** 30 days
+
+See `.github/workflows/README.md` for detailed workflow documentation.
 
 ---
 
@@ -508,10 +592,13 @@ Seed data location: `infrastructure/docker/init-platform-db.sql`
 
 ## Next Steps
 
-### Phase 1 (Current): Core Testing ✅
-- API tests for all services
-- Frontend tests for all personas
-- Integration tests for key workflows
+### Phase 1 (Current): Core Testing ✅ COMPLETE
+- ✅ API tests for all services
+- ✅ Frontend tests for all personas
+- ✅ Integration tests for key workflows
+- ✅ **CI/CD pipeline integration (GitHub Actions)**
+- ✅ **Automated PR checks**
+- ✅ **Test results reporting**
 
 ### Phase 2 (Future): Advanced Testing
 - [ ] Performance testing (load, stress)
@@ -520,12 +607,12 @@ Seed data location: `infrastructure/docker/init-platform-db.sql`
 - [ ] Mobile responsiveness testing
 - [ ] Cross-browser compatibility (expanded)
 
-### Phase 3 (Future): Automation
-- [ ] CI/CD pipeline integration
-- [ ] Automated regression testing
+### Phase 3 (Future): Monitoring & Analytics
 - [ ] Nightly test runs
 - [ ] Test results dashboard
 - [ ] Slack/email notifications
+- [ ] Test trend analysis
+- [ ] Flakiness tracking
 
 ---
 

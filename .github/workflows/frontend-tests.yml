@@ -90,10 +90,10 @@ jobs:
           NODE_ENV: test
         run: |
           # Start API Gateway and core services
-          cd apps/api-gateway && npm run build && node dist/index.js &
+          (cd apps/api-gateway && npm run build && node dist/index.js) &
           sleep 5
-          cd services/auth-service && npm run build && node dist/index.js &
-          cd services/tenant-manager && npm run build && node dist/index.js &
+          (cd services/auth-service && npm run build && node dist/index.js) &
+          (cd services/tenant-manager && npm run build && node dist/index.js) &
           
           # Wait for services
           sleep 20

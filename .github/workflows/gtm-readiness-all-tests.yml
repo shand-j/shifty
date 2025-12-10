@@ -127,11 +127,11 @@ jobs:
           OLLAMA_ENDPOINT: http://localhost:11434
           NODE_ENV: test
         run: |
-          cd services/auth-service && npm run build && PORT=3002 node dist/index.js &
-          cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js &
-          cd services/ai-orchestrator && npm run build && PORT=3003 node dist/index.js &
-          cd services/test-generator && npm run build && PORT=3004 node dist/index.js &
-          cd services/healing-engine && npm run build && PORT=3005 node dist/index.js &
+          (cd services/auth-service && npm run build && PORT=3002 node dist/index.js) &
+          (cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js) &
+          (cd services/ai-orchestrator && npm run build && PORT=3003 node dist/index.js) &
+          (cd services/test-generator && npm run build && PORT=3004 node dist/index.js) &
+          (cd services/healing-engine && npm run build && PORT=3005 node dist/index.js) &
           sleep 30
 
       - name: Run API tests with coverage
@@ -230,9 +230,9 @@ jobs:
           JWT_SECRET: test-secret-key-for-ci-do-not-use-in-production-32chars
           NODE_ENV: test
         run: |
-          cd apps/api-gateway && npm run build && PORT=3000 node dist/index.js &
-          cd services/auth-service && npm run build && PORT=3002 node dist/index.js &
-          cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js &
+          (cd apps/api-gateway && npm run build && PORT=3000 node dist/index.js) &
+          (cd services/auth-service && npm run build && PORT=3002 node dist/index.js) &
+          (cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js) &
           sleep 25
 
       - name: Run Playwright tests
@@ -322,14 +322,14 @@ jobs:
           sleep 15
           
           # Start all backend services
-          cd services/auth-service && npm run build && PORT=3002 node dist/index.js &
-          cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js &
-          cd services/ai-orchestrator && npm run build && PORT=3003 node dist/index.js &
-          cd services/test-generator && npm run build && PORT=3004 node dist/index.js &
-          cd services/healing-engine && npm run build && PORT=3005 node dist/index.js &
-          cd services/orchestrator-service && npm run build && PORT=3022 node dist/index.js &
-          cd services/results-service && npm run build && PORT=3023 node dist/index.js &
-          cd apps/api-gateway && npm run build && PORT=3000 node dist/index.js &
+          (cd services/auth-service && npm run build && PORT=3002 node dist/index.js) &
+          (cd services/tenant-manager && npm run build && PORT=3001 node dist/index.js) &
+          (cd services/ai-orchestrator && npm run build && PORT=3003 node dist/index.js) &
+          (cd services/test-generator && npm run build && PORT=3004 node dist/index.js) &
+          (cd services/healing-engine && npm run build && PORT=3005 node dist/index.js) &
+          (cd services/orchestrator-service && npm run build && PORT=3022 node dist/index.js) &
+          (cd services/results-service && npm run build && PORT=3023 node dist/index.js) &
+          (cd apps/api-gateway && npm run build && PORT=3000 node dist/index.js) &
           sleep 40
 
       - name: Run integration tests

@@ -98,11 +98,11 @@ jobs:
           NODE_ENV: test
         run: |
           # Start services in background
-          cd services/auth-service && npm run build && node dist/index.js &
-          cd services/tenant-manager && npm run build && node dist/index.js &
-          cd services/ai-orchestrator && npm run build && node dist/index.js &
-          cd services/test-generator && npm run build && node dist/index.js &
-          cd services/healing-engine && npm run build && node dist/index.js &
+          (cd services/auth-service && npm run build && node dist/index.js) &
+          (cd services/tenant-manager && npm run build && node dist/index.js) &
+          (cd services/ai-orchestrator && npm run build && node dist/index.js) &
+          (cd services/test-generator && npm run build && node dist/index.js) &
+          (cd services/healing-engine && npm run build && node dist/index.js) &
           
           # Wait for services to be ready
           sleep 30

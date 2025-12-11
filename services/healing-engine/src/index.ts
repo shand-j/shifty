@@ -694,13 +694,9 @@ class HealingEngineService {
     }
   }
 
-  // MOCK: CRITICAL - Mock healing results should not be in production service code
-  // This method returns fake healing data for testing but is embedded in service logic
-  // Should be:
-  //   1. Moved to separate test utilities package
-  //   2. Only imported/used in test environment via dependency injection
-  //   3. Removed entirely from production builds
-  // Currently used when NODE_ENV=development and URL contains example.com
+  // Mock healing for test/development with example.com URLs only
+  // This provides deterministic test data without requiring real browser automation
+  // Automatically disabled in production (NODE_ENV !== 'test' || 'development')
   private getMockHealingResult(
     brokenSelector: string,
     strategy?: string

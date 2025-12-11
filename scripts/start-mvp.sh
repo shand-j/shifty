@@ -66,16 +66,19 @@ sleep 15
 echo -e "${GREEN}📥 Pulling AI models (this may take a few minutes on first run)...${NC}"
 docker-compose exec ollama ollama pull llama3.1 || echo "Model pull failed, continuing..."
 
-# TODO: CRITICAL - Add orchestration services (orchestrator, results, artifacts, flakiness-tracker)
-# Missing services required for Shifty test orchestration:
-#   - orchestrator-service (3022) - Test sharding and job distribution
-#   - results-service (3023) - Test results collection
-#   - artifact-storage (3024) - Screenshot/video/trace storage
-#   - flakiness-tracker (3025) - Flakiness analytics
-#   - minio (9000-9001) - Object storage for artifacts
+# Start MinIO for artifact storage
+echo -e "${GREEN}📦 Starting MinIO object storage...${NC}"
+docker-compose up -d minio
+
+echo -e "${GREEN}⏳ Waiting for MinIO to be ready...${NC}"
+sleep 10
+
 # Start backend services
 echo -e "${GREEN}🏗️ Starting backend services...${NC}"
 docker-compose up -d auth-service tenant-manager ai-orchestrator test-generator healing-engine
+
+echo -e "${GREEN}🔧 Starting orchestration services...${NC}"
+docker-compose up -d orchestrator-service results-service artifact-storage flakiness-tracker
 
 echo -e "${GREEN}⏳ Waiting for services to be ready...${NC}"
 sleep 20
@@ -123,6 +126,12 @@ check_service "Tenant Manager" "http://localhost:3001"
 check_service "AI Orchestrator" "http://localhost:3003"
 check_service "Test Generator" "http://localhost:3004"
 check_service "Healing Engine" "http://localhost:3005"
+
+# Orchestration services
+check_service "Orchestrator Service" "http://localhost:3022"
+check_service "Results Service" "http://localhost:3023"
+check_service "Artifact Storage" "http://localhost:3024"
+check_service "Flakiness Tracker" "http://localhost:3025"
 
 # Display service status
 echo ""

@@ -16,18 +16,40 @@ git clone <repo-url> && cd shifty
 # Use Node 20.18+ / npm 10+
 npm install
 
-# Start the platform (all services)
+# Start the platform (all services including orchestration)
 ./scripts/start-mvp.sh
 
 # Verify everything works
-./scripts/validate-mvp.sh
+./scripts/health-check.sh
+
+# Test credentials (automatically seeded):
+# Email: test@shifty.com
+# Password: password123
 
 # Access the platform
 open http://localhost:3000
-
-> **Note:** The default Docker configuration now runs entirely on CPU so it works on macOS without an NVIDIA runtime. If you have a Linux host with an NVIDIA GPU and the NVIDIA Container Toolkit installed, set `COMPOSE_PROFILES=gpu` before running the scripts to re-enable GPU reservations for the Ollama service.
-> The startup script automatically builds (or refreshes when `FORCE_WORKSPACE_IMAGE=1`) the shared `shifty-workspace:node20-20251205` image. If you invoke `docker compose build` yourself, run `docker build -f Dockerfile.base -t shifty-workspace:node20-20251205 .` first to avoid repeated `npm ci` runs per service.
 ```
+
+> **Note:** The default Docker configuration runs entirely on CPU for macOS compatibility. For GPU acceleration on Linux with NVIDIA, set `COMPOSE_PROFILES=gpu` before starting.
+
+## 🏥 Health & Troubleshooting
+
+```bash
+# Check all services are healthy
+./scripts/health-check.sh
+
+# View troubleshooting guide
+cat docs/TROUBLESHOOTING.md
+
+# Check specific service logs
+docker logs shifty-api-gateway
+docker logs shifty-orchestrator-service
+```
+
+Common issues:
+- **Services won't start**: Check port conflicts with `sudo lsof -i :3000`
+- **Test user missing**: Rebuild database with `docker-compose up -d --force-recreate platform-db`
+- **Migration failed**: See [Troubleshooting Guide](./docs/TROUBLESHOOTING.md#2-database-migration-failed)
 
 ## 🎯 What is Shifty?
 
@@ -72,7 +94,7 @@ Shifty is an AI-augmented testing platform that automatically:
 | **Project Management** | **Testing** | **Operations** |
 |------------------------|-------------|----------------|
 | [Tech Debt Backlog](./docs/project-management/tech-debt-backlog.md) | [Test Strategy](./docs/testing/test-strategy.md) | [Monitoring](./docs/development/monitoring.md) |
-| [Project Status](./docs/project-management/project-status.md) | [Test Progress](./docs/project-management/test-progress-report.md) | [Troubleshooting](./docs/development/troubleshooting.md) |
+| [Project Status](./docs/project-management/project-status.md) | [Test Progress](./docs/project-management/test-progress-report.md) | [Troubleshooting](./docs/TROUBLESHOOTING.md) |
 | [Progress Tracking](./docs/project-management/progress-tracking.md) | [Performance Testing](./docs/testing/performance-testing.md) | [Security](./docs/development/security.md) |
 
 ---

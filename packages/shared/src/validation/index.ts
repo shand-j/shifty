@@ -142,7 +142,7 @@ export function sanitizeSelector(selector: string): string {
   // This includes: alphanumeric, dots, hashes, brackets, equals, quotes,
   // colons, hyphens, underscores, parentheses, plus, tilde, pipe, caret, dollar, spaces
   // Explicitly excludes: < > (HTML tags), ; { } (CSS blocks), backslash (escapes)
-  sanitized = sanitized.replace(/[^a-zA-Z0-9\s\.\#\[\]\=\"\'\*\:\-\_\(\)\+\~\|\^\$\/\@\,]/g, '');
+  sanitized = sanitized.replace(/[^a-zA-Z0-9\s.#[\]="'*:\-_()+=~|^$/,@]/g, '');
   
   // Even with allowlist, still check for dangerous patterns that could slip through
   // Run in a loop to handle recursive bypass attempts

@@ -293,6 +293,45 @@ export class APIClient {
     const response = await this.get('http://localhost:3000/health');
     return response.data;
   }
+
+  // Orchestrator Service methods
+  async orchestrateTests(request: any): Promise<any> {
+    const response = await this.post('http://localhost:3000/api/v1/orchestrate', request);
+    return response.data;
+  }
+
+  async getTestRunStatus(runId: string): Promise<any> {
+    const response = await this.get(`http://localhost:3000/api/v1/runs/${runId}`);
+    return response.data;
+  }
+
+  // Test Generator methods
+  async generateTests(request: any): Promise<any> {
+    const response = await this.post('http://localhost:3000/api/v1/tests/generate', request);
+    return response.data;
+  }
+
+  async getTestGenerationStatus(requestId: string): Promise<any> {
+    const response = await this.get(`http://localhost:3000/api/v1/tests/generate/${requestId}`);
+    return response.data;
+  }
+
+  // Generic HTTP methods for additional endpoints
+  async get(url: string, config?: any): Promise<any> {
+    return await this.client.get(url, config);
+  }
+
+  async post(url: string, data?: any, config?: any): Promise<any> {
+    return await this.client.post(url, data, config);
+  }
+
+  async put(url: string, data?: any, config?: any): Promise<any> {
+    return await this.client.put(url, data, config);
+  }
+
+  async delete(url: string, config?: any): Promise<any> {
+    return await this.client.delete(url, config);
+  }
 }
 
 // Test data factory

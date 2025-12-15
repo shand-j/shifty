@@ -255,16 +255,11 @@ class APIGateway {
 
   private metricsCollector = new MetricsCollector();
 
-  // HACK: HIGH - Service URLs hardcoded to localhost as fallback
-  // In production/Docker these should use service discovery or env vars
-  // Currently breaks when services run in containers (need DNS names)
-  // Should use:
-  //   - Kubernetes: service-name.namespace.svc.cluster.local
-  //   - Docker Compose: service-name (container name)
-  //   - Consul/Eureka for service discovery
-  // Service URLs configured via environment variables
-  // Supports both localhost (dev) and Docker service names (compose)
-  // For Kubernetes, use service-name.namespace.svc.cluster.local format
+  // Service URLs configured via environment variables with localhost fallback for development
+  // Production deployments should set explicit environment variables:
+  //   - Docker Compose: Uses service names (tenant-manager, auth-service, etc.)
+  //   - Kubernetes: Uses service-name.namespace.svc.cluster.local format
+  //   - Other: Set explicit URLs via environment variables
   private services: ServiceRoute[] = [
     {
       prefix: "/api/v1/tenants",

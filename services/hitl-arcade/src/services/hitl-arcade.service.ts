@@ -407,7 +407,6 @@ export class HITLArcadeService {
     type: LeaderboardType,
     limit: number = 10
   ): Promise<LeaderboardEntry[]> {
-    let query: string;
     let orderBy: string;
 
     switch (type) {
@@ -433,7 +432,7 @@ export class HITLArcadeService {
         orderBy = 'total_xp_earned DESC';
     }
 
-    query = `
+    const query = `
       SELECT user_id, display_name, avatar_url, level, ${this.getScoreColumn(type)} as score, badges
       FROM arcade_profiles
       WHERE tenant_id = $1

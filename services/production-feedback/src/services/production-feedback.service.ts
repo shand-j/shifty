@@ -709,7 +709,7 @@ describe('Regression: ${cluster.errorType}', () => {
     cluster: ErrorCluster
   ): Promise<Record<string, unknown>> {
     switch (action) {
-      case "generate_regression_test":
+      case "generate_regression_test": {
         const test = await this.generateRegressionTest({
           tenantId: rule.tenantId,
           errorClusterId: cluster.id,
@@ -720,8 +720,9 @@ describe('Regression: ${cluster.errorType}', () => {
           generateMultipleScenarios: true,
         });
         return { testId: test.id };
+      }
 
-      case "create_jira_ticket":
+      case "create_jira_ticket": {
         // Call integrations service
         const ticketResult = await axios.post(
           `${process.env.INTEGRATIONS_URL}/api/v1/jira/tickets`,
@@ -742,6 +743,7 @@ Last Seen: ${cluster.lastOccurrence}
           { timeout: 30000 }
         );
         return { ticketId: ticketResult.data.ticketId };
+      }
 
       case "notify_team":
         // Send notification via integrations service
